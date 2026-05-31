@@ -155,7 +155,7 @@ export function PlannerBoard() {
             <TaskList
               bucket="day"
               tasks={dayTasks}
-              emptyText="No tasks yet. Add one below or pull from the backlog."
+              emptyText="No tasks yet. Add one below or pull from the inbox."
             />
           )}
 
@@ -166,11 +166,11 @@ export function PlannerBoard() {
           <div className="my-4 border-t border-neutral-200" />
 
           <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-            Backlog
+            Inbox
           </h2>
-          <TaskList bucket="backlog" tasks={backlog} emptyText="Backlog is empty." />
+          <TaskList bucket="backlog" tasks={backlog} emptyText="Inbox is empty." />
           <div className="mt-2 px-1">
-            <AddTask placeholder="Add to backlog…" onAdd={addToBacklog} />
+            <AddTask placeholder="Add to inbox…" onAdd={addToBacklog} />
           </div>
         </section>
 
