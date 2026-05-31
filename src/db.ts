@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Comment, Task } from "./types";
+import type { Comment, Subtask, Task } from "./types";
 
 // Single shared connection to the SQLite database. The file lives in the app's
 // data directory; the schema/migrations are defined Rust-side in
@@ -16,10 +16,15 @@ export function getDb(): Promise<Database> {
 const COLUMNS =
   "id, title, notes, status, planned_date, scheduled_start, estimate_minutes, actual_minutes, sort_order, created_at, completed_at, timer_started_at";
 
+// Correlated subtask counts, appended to task selects for the row progress chip.
+const SUBTASK_COUNTS =
+  ", (SELECT COUNT(*) FROM subtasks s WHERE s.task_id = tasks.id) AS subtask_total" +
+  ", (SELECT COUNT(*) FROM subtasks s WHERE s.task_id = tasks.id AND s.done = 1) AS subtask_done";
+
 export async function fetchTasksForDate(date: string): Promise<Task[]> {
   const db = await getDb();
   return db.select<Task[]>(
-    `SELECT ${COLUMNS} FROM tasks WHERE planned_date = $1 ORDER BY sort_order ASC, id ASC`,
+    `SELECT ${COLUMNS}${SUBTASK_COUNTS} FROM tasks WHERE planned_date = $1 ORDER BY sort_order ASC, id ASC`,
     [date],
   );
 }
@@ -27,7 +32,7 @@ export async function fetchTasksForDate(date: string): Promise<Task[]> {
 export async function fetchBacklog(): Promise<Task[]> {
   const db = await getDb();
   return db.select<Task[]>(
-    `SELECT ${COLUMNS} FROM tasks WHERE planned_date IS NULL AND status != 'done' ORDER BY sort_order ASC, id ASC`,
+    `SELECT ${COLUMNS}${SUBTASK_COUNTS} FROM tasks WHERE planned_date IS NULL AND status != 'done' ORDER BY sort_order ASC, id ASC`,
   );
 }
 
@@ -35,7 +40,7 @@ export async function fetchBacklog(): Promise<Task[]> {
 export async function fetchCarryOver(today: string): Promise<Task[]> {
   const db = await getDb();
   return db.select<Task[]>(
-    `SELECT ${COLUMNS} FROM tasks
+    `SELECT ${COLUMNS}${SUBTASK_COUNTS} FROM tasks
        WHERE planned_date IS NOT NULL AND planned_date < $1 AND status != 'done'
        ORDER BY planned_date ASC, sort_order ASC`,
     [today],
@@ -99,7 +104,41 @@ export async function updateTask(
 export async function deleteTask(id: number): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM comments WHERE task_id = $1", [id]);
+  await db.execute("DELETE FROM subtasks WHERE task_id = $1", [id]);
   await db.execute("DELETE FROM tasks WHERE id = $1", [id]);
+}
+
+export async function fetchSubtasks(taskId: number): Promise<Subtask[]> {
+  const db = await getDb();
+  return db.select<Subtask[]>(
+    "SELECT id, task_id, title, done, sort_order, created_at FROM subtasks WHERE task_id = $1 ORDER BY sort_order ASC, id ASC",
+    [taskId],
+  );
+}
+
+export async function addSubtask(taskId: number, title: string): Promise<void> {
+  const db = await getDb();
+  const rows = await db.select<{ next: number }[]>(
+    "SELECT COALESCE(MAX(sort_order) + 1, 0) AS next FROM subtasks WHERE task_id = $1",
+    [taskId],
+  );
+  await db.execute(
+    "INSERT INTO subtasks (task_id, title, done, sort_order, created_at) VALUES ($1, $2, 0, $3, $4)",
+    [taskId, title, rows[0]?.next ?? 0, new Date().toISOString()],
+  );
+}
+
+export async function setSubtaskDone(id: number, done: boolean): Promise<void> {
+  const db = await getDb();
+  await db.execute("UPDATE subtasks SET done = $1 WHERE id = $2", [
+    done ? 1 : 0,
+    id,
+  ]);
+}
+
+export async function deleteSubtask(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM subtasks WHERE id = $1", [id]);
 }
 
 export async function fetchComments(taskId: number): Promise<Comment[]> {

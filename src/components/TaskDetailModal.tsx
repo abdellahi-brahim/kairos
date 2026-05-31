@@ -4,6 +4,7 @@ import { formatDateTime } from "../lib/date";
 import { EstimatePicker } from "./EstimatePicker";
 import { TimerControl } from "./TimerControl";
 import { RichTextEditor } from "./RichTextEditor";
+import { SubtaskList } from "./SubtaskList";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -140,6 +141,11 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             placeholder="Add details…"
             onChange={onDescChange}
           />
+
+          {/* Subtasks */}
+          <div className="mt-6">
+            <SubtaskList />
+          </div>
 
           {/* Comments */}
           <div className="mt-6">

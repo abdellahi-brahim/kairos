@@ -89,6 +89,15 @@ export function TaskItem({
               {formatDuration(task.actual_minutes)}
             </button>
           )}
+          {!!task.subtask_total && task.subtask_total > 0 && (
+            <button
+              onClick={open}
+              title="Subtasks"
+              className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-neutral-500"
+            >
+              ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+            </button>
+          )}
 
           {/* Fixed-width time + estimate columns keep rows aligned. */}
           <div className="flex w-14 justify-end">

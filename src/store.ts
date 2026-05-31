@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Comment, Task } from "./types";
+import type { Comment, Subtask, Task } from "./types";
 import * as repo from "./db";
 import { todayKey } from "./lib/date";
 
@@ -15,10 +15,14 @@ interface PlannerState {
   // Task detail modal
   detailTaskId: number | null;
   detailComments: Comment[];
+  detailSubtasks: Subtask[];
   openDetail: (id: number) => Promise<void>;
   closeDetail: () => void;
   addComment: (body: string) => Promise<void>;
   deleteComment: (id: number) => Promise<void>;
+  addSubtask: (title: string) => Promise<void>;
+  toggleSubtask: (sub: Subtask) => Promise<void>;
+  deleteSubtask: (id: number) => Promise<void>;
 
   refresh: () => Promise<void>;
   setDate: (date: string) => Promise<void>;
@@ -55,15 +59,20 @@ export const usePlanner = create<PlannerState>((set, get) => ({
 
   detailTaskId: null,
   detailComments: [],
+  detailSubtasks: [],
 
   openDetail: async (id) => {
-    set({ detailTaskId: id, detailComments: [] });
-    const comments = await repo.fetchComments(id);
+    set({ detailTaskId: id, detailComments: [], detailSubtasks: [] });
+    const [comments, subtasks] = await Promise.all([
+      repo.fetchComments(id),
+      repo.fetchSubtasks(id),
+    ]);
     // Ignore if the modal was closed/switched while loading.
-    if (get().detailTaskId === id) set({ detailComments: comments });
+    if (get().detailTaskId === id) set({ detailComments: comments, detailSubtasks: subtasks });
   },
 
-  closeDetail: () => set({ detailTaskId: null, detailComments: [] }),
+  closeDetail: () =>
+    set({ detailTaskId: null, detailComments: [], detailSubtasks: [] }),
 
   addComment: async (body) => {
     const id = get().detailTaskId;
@@ -76,6 +85,28 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     await repo.deleteComment(commentId);
     const id = get().detailTaskId;
     if (id != null) set({ detailComments: await repo.fetchComments(id) });
+  },
+
+  addSubtask: async (title) => {
+    const id = get().detailTaskId;
+    if (id == null) return;
+    await repo.addSubtask(id, title);
+    set({ detailSubtasks: await repo.fetchSubtasks(id) });
+    await get().refresh(); // update row progress chip
+  },
+
+  toggleSubtask: async (sub) => {
+    await repo.setSubtaskDone(sub.id, !sub.done);
+    const id = get().detailTaskId;
+    if (id != null) set({ detailSubtasks: await repo.fetchSubtasks(id) });
+    await get().refresh();
+  },
+
+  deleteSubtask: async (subId) => {
+    await repo.deleteSubtask(subId);
+    const id = get().detailTaskId;
+    if (id != null) set({ detailSubtasks: await repo.fetchSubtasks(id) });
+    await get().refresh();
   },
 
   refresh: async () => {

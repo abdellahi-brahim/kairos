@@ -15,6 +15,18 @@ export interface Task {
   created_at: string;
   completed_at: string | null;
   timer_started_at: string | null; // set while the timer is running (ISO), else null
+  // Computed in fetch queries (not stored columns):
+  subtask_total?: number;
+  subtask_done?: number;
+}
+
+export interface Subtask {
+  id: number;
+  task_id: number;
+  title: string;
+  done: number; // 0 or 1
+  sort_order: number;
+  created_at: string;
 }
 
 export interface Comment {
