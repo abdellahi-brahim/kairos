@@ -2,14 +2,13 @@ import { useState, type CSSProperties, type PointerEvent } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
-import { formatDuration } from "../lib/date";
 import * as dragCursor from "../lib/dragCursor";
+import { BlockCard, blockSurfaceClass } from "./BlockCard";
 import {
   DAY_END_MIN,
   DEFAULT_BLOCK_MIN,
   PX_PER_MIN,
   SNAP_MIN,
-  minutesToTime,
   snap,
   timeToMinutes,
   topForMinutes,
@@ -92,13 +91,28 @@ export function TimeBlock({ task }: { task: Task }) {
   const style: CSSProperties = {
     top: topForMinutes(startMin),
     height: shownDuration * PX_PER_MIN,
-    opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 30 : 10,
   };
+
+  // While dragging, the only visible card is the one moving in the DragOverlay
+  // (Google Calendar style: a single card that moves, no placeholder left
+  // behind). The source node stays mounted but invisible so dnd-kit keeps its
+  // ref/measurements; it is not a second visible card.
+  if (isDragging) {
+    return (
+      <div
+        ref={setNodeRef}
+        data-block-id={task.id}
+        style={{ ...style, opacity: 0 }}
+        className="pointer-events-none absolute left-14 right-2"
+      />
+    );
+  }
 
   return (
     <div
       ref={setNodeRef}
+      data-block-id={task.id}
       style={style}
       {...attributes}
       {...listeners}
@@ -112,40 +126,30 @@ export function TimeBlock({ task }: { task: Task }) {
         // will not repaint this element's cursor once the pointer is pressed.
         "absolute left-14 right-2 cursor-grab touch-none select-none overflow-hidden rounded-md border px-2 py-1 text-left shadow-sm " +
         (handleHover ? "ring-1 ring-indigo-300 " : "") +
-        (done
-          ? "border-neutral-200 bg-neutral-100 text-neutral-400"
-          : "border-indigo-200 bg-indigo-50 text-indigo-900")
+        blockSurfaceClass(done)
       }
     >
-      <div className="flex items-start justify-between gap-1">
-        <span
-          className={
-            "truncate text-xs font-medium " + (done ? "line-through" : "")
-          }
-        >
-          {task.title}
-        </span>
-        <button
-          aria-label="Remove from timeline"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => {
-            e.stopPropagation();
-            unschedule(task.id);
-          }}
-          className={
-            "shrink-0 text-[10px] text-indigo-400 hover:text-indigo-700 " +
-            (hovered ? "opacity-100" : "opacity-0")
-          }
-        >
-          ✕
-        </button>
-      </div>
-      {shownDuration >= 30 && (
-        <div className="text-[10px] opacity-70">
-          {minutesToTime(startMin)}–{minutesToTime(startMin + shownDuration)} ·{" "}
-          {formatDuration(shownDuration)}
-        </div>
-      )}
+      <BlockCard
+        task={task}
+        durationMin={shownDuration}
+        done={done}
+        trailing={
+          <button
+            aria-label="Remove from timeline"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation();
+              unschedule(task.id);
+            }}
+            className={
+              "shrink-0 text-[10px] text-indigo-400 hover:text-indigo-700 " +
+              (hovered ? "opacity-100" : "opacity-0")
+            }
+          >
+            ✕
+          </button>
+        }
+      />
 
       {/* Resize zone: distinct cursor + a grip that appears on hover so it
           reads as "resize" rather than "move". */}

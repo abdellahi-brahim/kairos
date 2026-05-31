@@ -10,16 +10,36 @@ import {
   type DragEndEvent,
   type DragOverEvent,
   type DragStartEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
-import { DEFAULT_BLOCK_MIN } from "../lib/timeline";
+import {
+  DEFAULT_BLOCK_MIN,
+  PX_PER_MIN,
+  SNAP_MIN,
+  clampStart,
+  minutesToTime,
+  snap,
+  timeToMinutes,
+} from "../lib/timeline";
+
+// While moving a block, lock it to the vertical axis and snap it to the 15-min
+// grid, so the single card jumps in slot increments as you drag (the card is
+// the preview - no separate drop ghost).
+const SNAP_PX = SNAP_MIN * PX_PER_MIN;
+const snapBlockToGrid: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+  y: Math.round(transform.y / SNAP_PX) * SNAP_PX,
+});
 import { todayKey } from "../lib/date";
 import { TaskList } from "./TaskList";
 import { AddTask } from "./AddTask";
 import { CarryOverStrip } from "./CarryOverStrip";
 import { Timeline, type DropPreview } from "./Timeline";
+import { BlockCard, blockSurfaceClass } from "./BlockCard";
 import * as dragCursor from "../lib/dragCursor";
 
 interface DragData {
@@ -73,12 +93,20 @@ export function PlannerBoard() {
     // real nodes are never transformed (blocks own their own top/height).
     setActiveTask(data?.type === "task" ? data.task : null);
     if (data?.type === "block") {
-      const r = e.active.rect.current.initial;
-      setActiveBlock({
-        task: data.task,
-        width: r?.width ?? 220,
-        height: r?.height ?? 30,
-      });
+      // Height is deterministic from the duration (same formula TimeBlock uses),
+      // never from the dnd rect (which is unreliable at drag start because the
+      // source re-renders to the invisible placeholder and would collapse the
+      // overlay to the tiny fallback size).
+      const duration = data.task.estimate_minutes ?? DEFAULT_BLOCK_MIN;
+      const height = duration * PX_PER_MIN;
+      // Width is the real timeline column width. Measure the rendered block
+      // element (the invisible placeholder still spans `left-14 right-2`, so its
+      // width is correct even on the first drag).
+      const el = document.querySelector<HTMLElement>(
+        `[data-block-id="${data.task.id}"]`,
+      );
+      const width = el?.getBoundingClientRect().width ?? 220;
+      setActiveBlock({ task: data.task, width, height });
     }
     // WKWebView will not repaint the pressed element's cursor mid-drag, so a
     // global cursor manager paints `grabbing` document-wide for the whole move.
@@ -95,7 +123,10 @@ export function PlannerBoard() {
   const onDragOver = (e: DragOverEvent) => {
     const a = e.active.data.current as DragData | undefined;
     const o = e.over?.data.current as { type?: string; time?: string } | undefined;
-    if (a && o?.type === "slot" && o.time) {
+    // Only show the dashed landing ghost when dragging a task IN from a list
+    // (its overlay is a small pill). A block move shows the moving card itself,
+    // so no separate ghost.
+    if (a?.type === "task" && o?.type === "slot" && o.time) {
       setPreview({
         time: o.time,
         durationMin: a.task.estimate_minutes ?? DEFAULT_BLOCK_MIN,
@@ -107,14 +138,30 @@ export function PlannerBoard() {
 
   const onDragEnd = (e: DragEndEvent) => {
     endDrag();
-    const { active, over } = e;
+    const { active, over, delta } = e;
     const aData = active.data.current as DragData | undefined;
+    if (!aData) return;
+
+    // Moving an existing block: land it by how far the CARD moved (snapped),
+    // matching the card's visual snap. Using the slot under the pointer would
+    // be off by wherever within the card you grabbed it.
+    if (aData.type === "block") {
+      const startMin = timeToMinutes(aData.task.scheduled_start!);
+      const duration = aData.task.estimate_minutes ?? DEFAULT_BLOCK_MIN;
+      const newStart = clampStart(
+        snap(startMin + delta.y / PX_PER_MIN),
+        duration,
+      );
+      scheduleTask(aData.task.id, minutesToTime(newStart));
+      return;
+    }
+
     const oData = over?.data.current as
       | { type: string; time?: string; bucket?: "day" | "backlog" }
       | undefined;
-    if (!over || !aData) return;
+    if (!over) return;
 
-    // Dropped on a timeline slot: schedule (or move) the task to that time.
+    // Dropping a task IN from a list onto a timeline slot.
     if (oData?.type === "slot" && oData.time) {
       scheduleTask(aData.task.id, oData.time);
       return;
@@ -201,17 +248,31 @@ export function PlannerBoard() {
         </section>
       </div>
 
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay
+        dropAnimation={null}
+        modifiers={activeBlock ? [snapBlockToGrid] : undefined}
+      >
         {activeTask ? (
           <div className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800 shadow-lg">
             {activeTask.title}
           </div>
         ) : activeBlock ? (
+          // The same block, just moving: identical surface/padding/radius/content
+          // as the resting card, with only a soft shadow to feel picked up.
           <div
             style={{ width: activeBlock.width, height: activeBlock.height }}
-            className="overflow-hidden rounded-md border border-indigo-300 bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-900 shadow-lg"
+            className={
+              "overflow-hidden rounded-md border px-2 py-1 text-left shadow-lg " +
+              blockSurfaceClass(activeBlock.task.status === "done")
+            }
           >
-            {activeBlock.task.title}
+            <BlockCard
+              task={activeBlock.task}
+              durationMin={
+                activeBlock.task.estimate_minutes ?? DEFAULT_BLOCK_MIN
+              }
+              done={activeBlock.task.status === "done"}
+            />
           </div>
         ) : null}
       </DragOverlay>

@@ -5,6 +5,29 @@ import { todayKey } from "./lib/date";
 
 type Bucket = "day" | "backlog";
 
+// Buckets that hold Task rows in the store. Optimistic patches walk all three so
+// a task is updated wherever it currently lives (a backlog task pulled onto the
+// timeline starts in `backlog`, a carried-over task in `carryOver`).
+const TASK_BUCKETS = ["dayTasks", "backlog", "carryOver"] as const;
+type TaskBucketKey = (typeof TASK_BUCKETS)[number];
+type TaskBuckets = Pick<PlannerState, TaskBucketKey>;
+
+// Apply `fields` to the matching task across every in-memory bucket and return
+// the new bucket arrays. Pure: callers decide what to do with the result.
+function patchTaskInBuckets(
+  buckets: TaskBuckets,
+  id: number,
+  fields: Partial<Task>,
+): TaskBuckets {
+  const next = {} as TaskBuckets;
+  for (const key of TASK_BUCKETS) {
+    next[key] = buckets[key].map((t) =>
+      t.id === id ? { ...t, ...fields } : t,
+    );
+  }
+  return next;
+}
+
 interface PlannerState {
   selectedDate: string;
   dayTasks: Task[];
@@ -26,6 +49,12 @@ interface PlannerState {
 
   refresh: () => Promise<void>;
   setDate: (date: string) => Promise<void>;
+  // Patch a task in memory immediately, then run `persist` in the background.
+  applyOptimistic: (
+    id: number,
+    fields: Partial<Task>,
+    persist: () => Promise<void>,
+  ) => Promise<void>;
 
   addToDay: (title: string, estimateMinutes?: number | null) => Promise<void>;
   addToBacklog: (title: string, estimateMinutes?: number | null) => Promise<void>;
@@ -124,6 +153,27 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     await get().refresh();
   },
 
+  // Optimistic mutation: patch the in-memory task synchronously so the UI is
+  // correct on the very next render, then persist in the background. No refresh
+  // on success, so the already-correct block never moves (the source of the
+  // drop flash). On failure, roll back to the pre-mutation snapshot and reload
+  // the truth from disk.
+  applyOptimistic: async (id, fields, persist) => {
+    const before: TaskBuckets = {
+      dayTasks: get().dayTasks,
+      backlog: get().backlog,
+      carryOver: get().carryOver,
+    };
+    set(patchTaskInBuckets(before, id, fields));
+    try {
+      await persist();
+    } catch (err) {
+      console.error("Optimistic update failed; rolling back", err);
+      set(before);
+      await get().refresh();
+    }
+  },
+
   addToDay: async (title, estimateMinutes) => {
     await repo.insertTask({
       title,
@@ -139,8 +189,14 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   },
 
   editTask: async (id, fields) => {
-    await repo.updateTask(id, fields);
-    await get().refresh();
+    // Patch in place first so edits that change visible geometry (e.g. a block
+    // resize committing estimate_minutes) take effect on the next render with no
+    // revert-then-snap. Refresh afterwards to reconcile derived data (subtask
+    // chips) and any list membership the edit may affect.
+    await get().applyOptimistic(id, fields as Partial<Task>, async () => {
+      await repo.updateTask(id, fields);
+      await get().refresh();
+    });
   },
 
   editTaskQuiet: async (id, fields) => {
@@ -150,19 +206,32 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   toggleComplete: async (task) => {
     if (task.status === "done") {
       // Re-open: status follows whether the task still belongs to a day.
-      await repo.updateTask(task.id, {
-        status: task.planned_date ? "planned" : "backlog",
+      const fields = {
+        status: (task.planned_date ? "planned" : "backlog") as Task["status"],
         completed_at: null,
-      });
+      };
+      await get().applyOptimistic(task.id, fields, () =>
+        repo.updateTask(task.id, fields),
+      );
     } else {
       // Completing also stops a running timer so the actual time is captured.
-      if (task.timer_started_at) await repo.stopRunningTimers();
-      await repo.updateTask(task.id, {
-        status: "done",
+      // The stored actual_minutes is recomputed in SQL, so refresh afterwards to
+      // pick up the folded-in elapsed time (only when a timer was running).
+      const wasRunning = !!task.timer_started_at;
+      const fields = {
+        status: "done" as Task["status"],
         completed_at: new Date().toISOString(),
+        timer_started_at: wasRunning ? null : task.timer_started_at,
+      };
+      await get().applyOptimistic(task.id, fields, async () => {
+        if (wasRunning) await repo.stopRunningTimers();
+        await repo.updateTask(task.id, {
+          status: fields.status,
+          completed_at: fields.completed_at,
+        });
+        if (wasRunning) await get().refresh();
       });
     }
-    await get().refresh();
   },
 
   removeTask: async (id) => {
@@ -171,36 +240,81 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   },
 
   reorder: async (_bucket, orderedIds) => {
-    await repo.reorderTasks(orderedIds);
-    await get().refresh();
+    // Reflect the new order in memory immediately so the rows do not snap back
+    // to the old order for a frame while the per-row UPDATEs run.
+    const order = new Map(orderedIds.map((id, i) => [id, i]));
+    const sortByOrder = (tasks: Task[]) =>
+      tasks
+        .map((t) => (order.has(t.id) ? { ...t, sort_order: order.get(t.id)! } : t))
+        .sort((a, b) => a.sort_order - b.sort_order || a.id - b.id);
+    const before = {
+      dayTasks: get().dayTasks,
+      backlog: get().backlog,
+      carryOver: get().carryOver,
+    };
+    set({
+      dayTasks: sortByOrder(before.dayTasks),
+      backlog: sortByOrder(before.backlog),
+      carryOver: before.carryOver,
+    });
+    try {
+      await repo.reorderTasks(orderedIds);
+    } catch (err) {
+      console.error("Reorder failed; rolling back", err);
+      set(before);
+      await get().refresh();
+    }
   },
 
   moveTask: async (id, toDate) => {
-    const fields: Record<string, string | number | null> = {
+    const fields: Partial<Task> = {
       planned_date: toDate,
       status: toDate ? "planned" : "backlog",
     };
     // Moving back to the backlog clears any timeline placement.
     if (!toDate) fields.scheduled_start = null;
-    await repo.updateTask(id, fields);
-    await get().refresh();
+    // Cross-bucket move: the optimistic patch updates the row's fields in place,
+    // but the row needs to appear in the other bucket too. Persist then refresh
+    // so it lands in the right list; the patch keeps the moment-of-drop frame
+    // consistent (no stale status flicker) while the reload completes.
+    await get().applyOptimistic(id, fields, async () => {
+      await repo.updateTask(id, fields as Record<string, string | number | null>);
+      await get().refresh();
+    });
   },
 
   scheduleTask: async (id, startTime) => {
-    const task = [...get().dayTasks, ...get().backlog].find((t) => t.id === id);
-    const fields: Record<string, string | number | null> = {
-      planned_date: get().selectedDate,
+    const task = [
+      ...get().dayTasks,
+      ...get().backlog,
+      ...get().carryOver,
+    ].find((t) => t.id === id);
+    const selectedDate = get().selectedDate;
+    const fields: Partial<Task> = {
+      planned_date: selectedDate,
       scheduled_start: startTime,
     };
     // A backlog task pulled onto the timeline becomes a planned task.
     if (task?.status === "backlog") fields.status = "planned";
-    await repo.updateTask(id, fields);
-    await get().refresh();
+    // If the task already lives on the selected day (the common case: moving an
+    // existing block), the optimistic patch alone puts it at its final slot, so
+    // no reload is needed and the block never flashes at its old position.
+    // A task arriving from the backlog or another day must also move buckets, so
+    // reload after persisting to land it in dayTasks.
+    const needsReload =
+      !task || task.planned_date !== selectedDate;
+    await get().applyOptimistic(id, fields, async () => {
+      await repo.updateTask(id, fields as Record<string, string | number | null>);
+      if (needsReload) await get().refresh();
+    });
   },
 
   unscheduleTask: async (id) => {
-    await repo.updateTask(id, { scheduled_start: null });
-    await get().refresh();
+    // The task stays on the same day, just leaves the timeline. Patch in place,
+    // persist in the background; no reload needed.
+    await get().applyOptimistic(id, { scheduled_start: null }, () =>
+      repo.updateTask(id, { scheduled_start: null }),
+    );
   },
 
   toggleTimer: async (task) => {
