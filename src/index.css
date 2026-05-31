@@ -17,3 +17,64 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Rich-text editor content (TipTap). Tailwind's reset removes these defaults. */
+.rt-content {
+  font-size: 0.875rem;
+  color: #374151;
+  min-height: 6rem;
+}
+.rt-content p {
+  margin: 0.25em 0;
+}
+.rt-content h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.rt-content h2 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0.5em 0 0.25em;
+}
+.rt-content ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.25em 0;
+}
+.rt-content ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.25em 0;
+}
+.rt-content code {
+  background: #f3f4f6;
+  padding: 0 0.25em;
+  border-radius: 0.25rem;
+  font-size: 0.85em;
+}
+.rt-content pre {
+  background: #f3f4f6;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.375rem;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.rt-content pre code {
+  background: transparent;
+  padding: 0;
+}
+.rt-content blockquote {
+  border-left: 3px solid #e5e7eb;
+  padding-left: 0.75rem;
+  color: #6b7280;
+  margin: 0.5em 0;
+}
+/* Placeholder text for the empty editor */
+.rt-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

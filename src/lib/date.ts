@@ -23,6 +23,10 @@ export function relativeLabel(key: string): string | null {
   return null;
 }
 
+export function formatDateTime(iso: string): string {
+  return format(parseISO(iso), "MMM d, h:mm a");
+}
+
 export function formatDuration(minutes: number): string {
   if (minutes <= 0) return "0m";
   const h = Math.floor(minutes / 60);

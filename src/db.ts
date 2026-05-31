@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Task } from "./types";
+import type { Comment, Task } from "./types";
 
 // Single shared connection to the SQLite database. The file lives in the app's
 // data directory; the schema/migrations are defined Rust-side in
@@ -98,7 +98,29 @@ export async function updateTask(
 
 export async function deleteTask(id: number): Promise<void> {
   const db = await getDb();
+  await db.execute("DELETE FROM comments WHERE task_id = $1", [id]);
   await db.execute("DELETE FROM tasks WHERE id = $1", [id]);
+}
+
+export async function fetchComments(taskId: number): Promise<Comment[]> {
+  const db = await getDb();
+  return db.select<Comment[]>(
+    "SELECT id, task_id, body, created_at FROM comments WHERE task_id = $1 ORDER BY created_at ASC, id ASC",
+    [taskId],
+  );
+}
+
+export async function addComment(taskId: number, body: string): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "INSERT INTO comments (task_id, body, created_at) VALUES ($1, $2, $3)",
+    [taskId, body, new Date().toISOString()],
+  );
+}
+
+export async function deleteComment(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM comments WHERE id = $1", [id]);
 }
 
 // Persist a new manual ordering for a set of tasks.

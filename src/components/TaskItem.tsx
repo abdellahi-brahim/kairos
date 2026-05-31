@@ -3,8 +3,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
-import { EstimatePicker } from "./EstimatePicker";
-import { TimerControl } from "./TimerControl";
+import { formatDuration } from "../lib/date";
 
 export function TaskItem({
   task,
@@ -13,15 +12,11 @@ export function TaskItem({
   task: Task;
   bucket: "day" | "backlog";
 }) {
-  const editTask = usePlanner((s) => s.editTask);
   const toggleComplete = usePlanner((s) => s.toggleComplete);
   const removeTask = usePlanner((s) => s.removeTask);
+  const openDetail = usePlanner((s) => s.openDetail);
 
-  const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState(task.title);
-  const [showNotes, setShowNotes] = useState(false);
-  // JS-driven hover: WKWebView leaves CSS :hover stuck after a drag, so
-  // group-hover reveals become unreliable. Pointer events stay reliable.
+  // JS-driven hover: WKWebView leaves CSS :hover stuck after a drag.
   const [hovered, setHovered] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -33,16 +28,8 @@ export function TaskItem({
   };
 
   const done = task.status === "done";
-
-  const saveTitle = () => {
-    const next = title.trim();
-    if (next && next !== task.title) {
-      editTask(task.id, { title: next });
-    } else {
-      setTitle(task.title);
-    }
-    setEditing(false);
-  };
+  const running = !!task.timer_started_at;
+  const open = () => openDetail(task.id);
 
   return (
     <li
@@ -75,38 +62,35 @@ export function TaskItem({
           className="h-4 w-4 shrink-0 cursor-pointer accent-indigo-500"
         />
 
-        {editing ? (
-          <input
-            value={title}
-            autoFocus
-            onChange={(e) => setTitle(e.target.value)}
-            onBlur={saveTitle}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") saveTitle();
-              if (e.key === "Escape") {
-                setTitle(task.title);
-                setEditing(false);
-              }
-            }}
-            className="flex-1 rounded border border-neutral-300 px-1 py-0.5 text-sm outline-none"
-          />
-        ) : (
-          <span
-            onClick={() => setEditing(true)}
-            className={
-              done
-                ? "flex-1 cursor-text text-sm text-neutral-400 line-through"
-                : "flex-1 cursor-text text-sm text-neutral-800"
-            }
-          >
-            {task.title}
-          </span>
-        )}
+        <button
+          onClick={open}
+          title="Open details"
+          className={
+            "flex-1 truncate text-left text-sm " +
+            (done ? "text-neutral-400 line-through" : "text-neutral-800")
+          }
+        >
+          {task.title}
+        </button>
 
         <div className="ml-auto flex items-center gap-1">
-          {/* Timer/actual sits first; the fixed-width time and estimate slots
-              after it keep those columns aligned across rows. */}
-          <TimerControl task={task} revealed={hovered} />
+          {running && (
+            <span
+              title="Timer running"
+              className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
+            />
+          )}
+          {task.actual_minutes > 0 && (
+            <button
+              onClick={open}
+              title="Tracked time"
+              className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-emerald-600"
+            >
+              {formatDuration(task.actual_minutes)}
+            </button>
+          )}
+
+          {/* Fixed-width time + estimate columns keep rows aligned. */}
           <div className="flex w-14 justify-end">
             {task.scheduled_start && (
               <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-neutral-500">
@@ -114,21 +98,21 @@ export function TaskItem({
               </span>
             )}
           </div>
-          <EstimatePicker
-            value={task.estimate_minutes}
-            revealed={hovered}
-            onChange={(v) => editTask(task.id, { estimate_minutes: v })}
-          />
           <button
-            aria-label="Toggle notes"
-            onClick={() => setShowNotes((s) => !s)}
+            onClick={open}
+            title="Estimate"
             className={
-              "w-5 rounded text-center text-xs hover:bg-neutral-100 " +
-              (task.notes || hovered ? "text-neutral-500" : "text-neutral-400 opacity-0")
+              task.estimate_minutes != null
+                ? "block w-11 rounded-md bg-indigo-50 px-1.5 py-0.5 text-center text-xs font-medium text-indigo-600"
+                : "block w-11 rounded-md px-1.5 py-0.5 text-center text-xs text-neutral-400 " +
+                  (hovered ? "opacity-100" : "opacity-0")
             }
           >
-            ☰
+            {task.estimate_minutes != null
+              ? formatDuration(task.estimate_minutes)
+              : "+ est"}
           </button>
+
           <button
             aria-label="Delete task"
             onClick={() => removeTask(task.id)}
@@ -141,18 +125,6 @@ export function TaskItem({
           </button>
         </div>
       </div>
-
-      {showNotes && (
-        <textarea
-          defaultValue={task.notes ?? ""}
-          placeholder="Notes..."
-          onBlur={(e) =>
-            editTask(task.id, { notes: e.target.value.trim() || null })
-          }
-          className="mt-1.5 ml-8 w-[calc(100%-2.5rem)] resize-y rounded border border-neutral-200 p-2 text-xs text-neutral-700 outline-none focus:border-neutral-300"
-          rows={2}
-        />
-      )}
     </li>
   );
 }

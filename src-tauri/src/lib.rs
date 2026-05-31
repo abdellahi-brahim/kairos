@@ -29,6 +29,17 @@ pub fn run() {
             sql: "ALTER TABLE tasks ADD COLUMN timer_started_at TEXT;",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 3,
+            description: "create_comments_table",
+            sql: "CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            body TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

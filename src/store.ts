@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Task } from "./types";
+import type { Comment, Task } from "./types";
 import * as repo from "./db";
 import { todayKey } from "./lib/date";
 
@@ -12,12 +12,25 @@ interface PlannerState {
   carryOver: Task[];
   loading: boolean;
 
+  // Task detail modal
+  detailTaskId: number | null;
+  detailComments: Comment[];
+  openDetail: (id: number) => Promise<void>;
+  closeDetail: () => void;
+  addComment: (body: string) => Promise<void>;
+  deleteComment: (id: number) => Promise<void>;
+
   refresh: () => Promise<void>;
   setDate: (date: string) => Promise<void>;
 
   addToDay: (title: string, estimateMinutes?: number | null) => Promise<void>;
   addToBacklog: (title: string, estimateMinutes?: number | null) => Promise<void>;
   editTask: (
+    id: number,
+    fields: Record<string, string | number | null>,
+  ) => Promise<void>;
+  // Persist without reloading the board (for high-frequency edits like typing).
+  editTaskQuiet: (
     id: number,
     fields: Record<string, string | number | null>,
   ) => Promise<void>;
@@ -39,6 +52,31 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   backlog: [],
   carryOver: [],
   loading: true,
+
+  detailTaskId: null,
+  detailComments: [],
+
+  openDetail: async (id) => {
+    set({ detailTaskId: id, detailComments: [] });
+    const comments = await repo.fetchComments(id);
+    // Ignore if the modal was closed/switched while loading.
+    if (get().detailTaskId === id) set({ detailComments: comments });
+  },
+
+  closeDetail: () => set({ detailTaskId: null, detailComments: [] }),
+
+  addComment: async (body) => {
+    const id = get().detailTaskId;
+    if (id == null) return;
+    await repo.addComment(id, body);
+    set({ detailComments: await repo.fetchComments(id) });
+  },
+
+  deleteComment: async (commentId) => {
+    await repo.deleteComment(commentId);
+    const id = get().detailTaskId;
+    if (id != null) set({ detailComments: await repo.fetchComments(id) });
+  },
 
   refresh: async () => {
     const date = get().selectedDate;
@@ -72,6 +110,10 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   editTask: async (id, fields) => {
     await repo.updateTask(id, fields);
     await get().refresh();
+  },
+
+  editTaskQuiet: async (id, fields) => {
+    await repo.updateTask(id, fields);
   },
 
   toggleComplete: async (task) => {
