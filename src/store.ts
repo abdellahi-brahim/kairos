@@ -9,6 +9,7 @@ interface PlannerState {
   selectedDate: string;
   dayTasks: Task[];
   backlog: Task[];
+  carryOver: Task[];
   loading: boolean;
 
   refresh: () => Promise<void>;
@@ -26,21 +27,27 @@ interface PlannerState {
   moveTask: (id: number, toDate: string | null) => Promise<void>;
   scheduleTask: (id: number, startTime: string) => Promise<void>;
   unscheduleTask: (id: number) => Promise<void>;
+  toggleTimer: (task: Task) => Promise<void>;
+  setActual: (id: number, minutes: number) => Promise<void>;
+  moveToToday: (id: number) => Promise<void>;
+  moveAllToToday: (ids: number[]) => Promise<void>;
 }
 
 export const usePlanner = create<PlannerState>((set, get) => ({
   selectedDate: todayKey(),
   dayTasks: [],
   backlog: [],
+  carryOver: [],
   loading: true,
 
   refresh: async () => {
     const date = get().selectedDate;
-    const [dayTasks, backlog] = await Promise.all([
+    const [dayTasks, backlog, carryOver] = await Promise.all([
       repo.fetchTasksForDate(date),
       repo.fetchBacklog(),
+      repo.fetchCarryOver(todayKey()),
     ]);
-    set({ dayTasks, backlog, loading: false });
+    set({ dayTasks, backlog, carryOver, loading: false });
   },
 
   setDate: async (date) => {
@@ -75,6 +82,8 @@ export const usePlanner = create<PlannerState>((set, get) => ({
         completed_at: null,
       });
     } else {
+      // Completing also stops a running timer so the actual time is captured.
+      if (task.timer_started_at) await repo.stopRunningTimers();
       await repo.updateTask(task.id, {
         status: "done",
         completed_at: new Date().toISOString(),
@@ -118,6 +127,43 @@ export const usePlanner = create<PlannerState>((set, get) => ({
 
   unscheduleTask: async (id) => {
     await repo.updateTask(id, { scheduled_start: null });
+    await get().refresh();
+  },
+
+  toggleTimer: async (task) => {
+    if (task.timer_started_at) {
+      await repo.stopRunningTimers();
+    } else {
+      await repo.startTimer(task.id);
+    }
+    await get().refresh();
+  },
+
+  setActual: async (id, minutes) => {
+    await repo.updateTask(id, { actual_minutes: Math.max(0, Math.round(minutes)) });
+    await get().refresh();
+  },
+
+  moveToToday: async (id) => {
+    await repo.updateTask(id, {
+      planned_date: todayKey(),
+      status: "planned",
+      scheduled_start: null,
+    });
+    await get().refresh();
+  },
+
+  moveAllToToday: async (ids) => {
+    const today = todayKey();
+    await Promise.all(
+      ids.map((id) =>
+        repo.updateTask(id, {
+          planned_date: today,
+          status: "planned",
+          scheduled_start: null,
+        }),
+      ),
+    );
     await get().refresh();
   },
 }));

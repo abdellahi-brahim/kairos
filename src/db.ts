@@ -14,7 +14,7 @@ export function getDb(): Promise<Database> {
 }
 
 const COLUMNS =
-  "id, title, notes, status, planned_date, scheduled_start, estimate_minutes, actual_minutes, sort_order, created_at, completed_at";
+  "id, title, notes, status, planned_date, scheduled_start, estimate_minutes, actual_minutes, sort_order, created_at, completed_at, timer_started_at";
 
 export async function fetchTasksForDate(date: string): Promise<Task[]> {
   const db = await getDb();
@@ -28,6 +28,17 @@ export async function fetchBacklog(): Promise<Task[]> {
   const db = await getDb();
   return db.select<Task[]>(
     `SELECT ${COLUMNS} FROM tasks WHERE planned_date IS NULL AND status != 'done' ORDER BY sort_order ASC, id ASC`,
+  );
+}
+
+// Unfinished tasks dated before `today` (carried over from previous days).
+export async function fetchCarryOver(today: string): Promise<Task[]> {
+  const db = await getDb();
+  return db.select<Task[]>(
+    `SELECT ${COLUMNS} FROM tasks
+       WHERE planned_date IS NOT NULL AND planned_date < $1 AND status != 'done'
+       ORDER BY planned_date ASC, sort_order ASC`,
+    [today],
   );
 }
 
@@ -99,4 +110,28 @@ export async function reorderTasks(orderedIds: number[]): Promise<void> {
       orderedIds[i],
     ]);
   }
+}
+
+// Stop any running timer(s), folding elapsed whole minutes into actual_minutes.
+// Done in SQL so the elapsed time is computed from the stored start timestamp,
+// surviving app restarts.
+export async function stopRunningTimers(): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    `UPDATE tasks
+       SET actual_minutes = actual_minutes
+             + CAST((julianday('now') - julianday(timer_started_at)) * 1440 AS INTEGER),
+           timer_started_at = NULL
+     WHERE timer_started_at IS NOT NULL`,
+  );
+}
+
+// Start the timer on one task (after stopping any others).
+export async function startTimer(id: number): Promise<void> {
+  await stopRunningTimers();
+  const db = await getDb();
+  await db.execute(
+    "UPDATE tasks SET timer_started_at = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = $1",
+    [id],
+  );
 }

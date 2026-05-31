@@ -2,10 +2,11 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let migrations = vec![Migration {
-        version: 1,
-        description: "create_tasks_table",
-        sql: "CREATE TABLE IF NOT EXISTS tasks (
+    let migrations = vec![
+        Migration {
+            version: 1,
+            description: "create_tasks_table",
+            sql: "CREATE TABLE IF NOT EXISTS tasks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
             notes TEXT,
@@ -18,8 +19,17 @@ pub fn run() {
             created_at TEXT NOT NULL,
             completed_at TEXT
         );",
-        kind: MigrationKind::Up,
-    }];
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 2,
+            description: "add_timer_started_at",
+            // Set while a task's timer is running; actual_minutes holds the
+            // accumulated total committed when the timer stops.
+            sql: "ALTER TABLE tasks ADD COLUMN timer_started_at TEXT;",
+            kind: MigrationKind::Up,
+        },
+    ];
 
     tauri::Builder::default()
         .plugin(

@@ -4,6 +4,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { EstimatePicker } from "./EstimatePicker";
+import { TimerControl } from "./TimerControl";
 
 export function TaskItem({
   task,
@@ -103,8 +104,9 @@ export function TaskItem({
         )}
 
         <div className="ml-auto flex items-center gap-1">
-          {/* Fixed-width slots keep the time and estimate columns aligned
-              across rows regardless of value width or scheduling. */}
+          {/* Timer/actual sits first; the fixed-width time and estimate slots
+              after it keep those columns aligned across rows. */}
+          <TimerControl task={task} revealed={hovered} />
           <div className="flex w-14 justify-end">
             {task.scheduled_start && (
               <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-neutral-500">

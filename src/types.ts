@@ -14,4 +14,5 @@ export interface Task {
   sort_order: number;
   created_at: string;
   completed_at: string | null;
+  timer_started_at: string | null; // set while the timer is running (ISO), else null
 }

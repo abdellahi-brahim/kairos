@@ -15,8 +15,10 @@ import { arrayMove } from "@dnd-kit/sortable";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { DEFAULT_BLOCK_MIN } from "../lib/timeline";
+import { todayKey } from "../lib/date";
 import { TaskList } from "./TaskList";
 import { AddTask } from "./AddTask";
+import { CarryOverStrip } from "./CarryOverStrip";
 import { Timeline, type DropPreview } from "./Timeline";
 
 interface DragData {
@@ -136,6 +138,8 @@ export function PlannerBoard() {
       <div className="flex flex-1 overflow-hidden">
         {/* Planning panel */}
         <section className="flex w-[440px] shrink-0 flex-col overflow-y-auto border-r border-neutral-200 px-4 py-4">
+          {selectedDate === todayKey() && <CarryOverStrip />}
+
           <div className="mb-1 flex items-baseline justify-between px-2">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
               This day

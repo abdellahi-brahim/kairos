@@ -1,6 +1,8 @@
 import { useDroppable } from "@dnd-kit/core";
 import { usePlanner } from "../store";
+import { todayKey } from "../lib/date";
 import { TimeBlock } from "./TimeBlock";
+import { NowLine } from "./NowLine";
 import {
   HOURS,
   PX_PER_MIN,
@@ -35,6 +37,7 @@ function Slot({ time }: { time: string }) {
 
 export function Timeline({ preview }: { preview: DropPreview | null }) {
   const dayTasks = usePlanner((s) => s.dayTasks);
+  const selectedDate = usePlanner((s) => s.selectedDate);
   const scheduled = dayTasks.filter((t) => t.scheduled_start);
 
   return (
@@ -72,6 +75,9 @@ export function Timeline({ preview }: { preview: DropPreview | null }) {
       {scheduled.map((task) => (
         <TimeBlock key={task.id} task={task} />
       ))}
+
+      {/* Current-time marker (only when viewing today) */}
+      {selectedDate === todayKey() && <NowLine />}
     </div>
   );
 }
