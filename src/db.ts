@@ -14,7 +14,7 @@ export function getDb(): Promise<Database> {
 }
 
 const COLUMNS =
-  "id, title, notes, status, planned_date, scheduled_start, estimate_minutes, actual_minutes, sort_order, created_at, completed_at, timer_started_at";
+  "id, title, notes, status, planned_date, scheduled_start, estimate_minutes, actual_minutes, sort_order, created_at, completed_at, timer_started_at, priority, tags";
 
 // Correlated subtask counts, appended to task selects for the row progress chip.
 const SUBTASK_COUNTS =

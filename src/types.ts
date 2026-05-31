@@ -15,6 +15,8 @@ export interface Task {
   created_at: string;
   completed_at: string | null;
   timer_started_at: string | null; // set while the timer is running (ISO), else null
+  priority: number; // 0 none, 1 low, 2 medium, 3 high
+  tags: string | null; // JSON array of strings, e.g. ["work","urgent"]
   // Computed in fetch queries (not stored columns):
   subtask_total?: number;
   subtask_done?: number;

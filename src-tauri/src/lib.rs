@@ -53,6 +53,20 @@ pub fn run() {
         );",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 5,
+            description: "add_priority",
+            // priority: 0 none, 1 low, 2 medium, 3 high.
+            sql: "ALTER TABLE tasks ADD COLUMN priority INTEGER NOT NULL DEFAULT 0;",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 6,
+            description: "add_tags",
+            // tags: JSON array of strings, e.g. ["work","urgent"].
+            sql: "ALTER TABLE tasks ADD COLUMN tags TEXT;",
+            kind: MigrationKind::Up,
+        },
     ];
 
     tauri::Builder::default()

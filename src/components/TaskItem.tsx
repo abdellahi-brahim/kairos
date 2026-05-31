@@ -4,6 +4,8 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration } from "../lib/date";
+import { priorityMeta } from "../lib/priority";
+import { parseTags, tagColor } from "../lib/tags";
 
 export function TaskItem({
   task,
@@ -29,6 +31,7 @@ export function TaskItem({
 
   const done = task.status === "done";
   const running = !!task.timer_started_at;
+  const tags = parseTags(task.tags);
   const open = () => openDetail(task.id);
 
   return (
@@ -62,6 +65,15 @@ export function TaskItem({
           className="h-4 w-4 shrink-0 cursor-pointer accent-indigo-500"
         />
 
+        {task.priority > 0 && (
+          <span
+            title={`${priorityMeta(task.priority).label} priority`}
+            className={
+              "h-2 w-2 shrink-0 rounded-full " + priorityMeta(task.priority).dot
+            }
+          />
+        )}
+
         <button
           onClick={open}
           title="Open details"
@@ -74,6 +86,22 @@ export function TaskItem({
         </button>
 
         <div className="ml-auto flex items-center gap-1">
+          {tags.slice(0, 2).map((t) => (
+            <button
+              key={t}
+              onClick={open}
+              className={
+                "rounded px-1.5 py-0.5 text-[10px] font-medium " + tagColor(t)
+              }
+            >
+              {t}
+            </button>
+          ))}
+          {tags.length > 2 && (
+            <span className="text-[10px] text-neutral-400">
+              +{tags.length - 2}
+            </span>
+          )}
           {running && (
             <span
               title="Timer running"

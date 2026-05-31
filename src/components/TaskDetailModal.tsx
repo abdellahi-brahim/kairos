@@ -5,6 +5,8 @@ import { EstimatePicker } from "./EstimatePicker";
 import { TimerControl } from "./TimerControl";
 import { RichTextEditor } from "./RichTextEditor";
 import { SubtaskList } from "./SubtaskList";
+import { PriorityPicker } from "./PriorityPicker";
+import { TagEditor } from "./TagEditor";
 
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -113,6 +115,12 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
         <div className="flex-1 overflow-y-auto p-4">
           {/* Metadata */}
           <div className="mb-4 flex flex-wrap items-center gap-4">
+            <Meta label="Priority">
+              <PriorityPicker
+                value={task.priority}
+                onChange={(v) => editTask(task.id, { priority: v })}
+              />
+            </Meta>
             <Meta label="Estimate">
               <EstimatePicker
                 value={task.estimate_minutes}
@@ -130,6 +138,16 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
                 </span>
               </Meta>
             )}
+          </div>
+
+          {/* Tags */}
+          <div className="mb-4">
+            <Meta label="Tags">
+              <TagEditor
+                value={task.tags}
+                onChange={(json) => editTask(task.id, { tags: json })}
+              />
+            </Meta>
           </div>
 
           {/* Description */}
