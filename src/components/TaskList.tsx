@@ -1,18 +1,9 @@
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
+import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
-  arrayMove,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import type { Task } from "../types";
-import { usePlanner } from "../store";
 import { TaskItem } from "./TaskItem";
 
 interface TaskListProps {
@@ -21,45 +12,37 @@ interface TaskListProps {
   emptyText: string;
 }
 
+// Reordering and drag-to-schedule are driven by the shared DndContext in
+// PlannerBoard. The wrapping div is a droppable so a task can be dragged from
+// another bucket onto this list (including when the list is empty).
 export function TaskList({ bucket, tasks, emptyText }: TaskListProps) {
-  const reorder = usePlanner((s) => s.reorder);
-
-  // A small drag threshold so clicks on the handle still register as clicks
-  // elsewhere in the row (checkbox, title, buttons).
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
-  );
-
-  const onDragEnd = (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-    const ids = tasks.map((t) => t.id);
-    const from = ids.indexOf(Number(active.id));
-    const to = ids.indexOf(Number(over.id));
-    if (from === -1 || to === -1) return;
-    reorder(bucket, arrayMove(ids, from, to));
-  };
-
-  if (tasks.length === 0) {
-    return <p className="px-2 py-3 text-sm text-neutral-400">{emptyText}</p>;
-  }
+  const { setNodeRef, isOver } = useDroppable({
+    id: `list-${bucket}`,
+    data: { type: "list", bucket },
+  });
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragEnd={onDragEnd}
+    <div
+      ref={setNodeRef}
+      className={
+        "min-h-[2.5rem] rounded-lg " +
+        (isOver ? "bg-indigo-50/60 ring-1 ring-indigo-200" : "")
+      }
     >
-      <SortableContext
-        items={tasks.map((t) => t.id)}
-        strategy={verticalListSortingStrategy}
-      >
-        <ul className="flex flex-col gap-0.5">
-          {tasks.map((task) => (
-            <TaskItem key={task.id} task={task} />
-          ))}
-        </ul>
-      </SortableContext>
-    </DndContext>
+      {tasks.length === 0 ? (
+        <p className="px-2 py-3 text-sm text-neutral-400">{emptyText}</p>
+      ) : (
+        <SortableContext
+          items={tasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <ul className="flex flex-col gap-0.5">
+            {tasks.map((task) => (
+              <TaskItem key={task.id} task={task} bucket={bucket} />
+            ))}
+          </ul>
+        </SortableContext>
+      )}
+    </div>
   );
 }

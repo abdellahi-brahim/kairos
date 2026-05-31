@@ -24,6 +24,8 @@ interface PlannerState {
   removeTask: (id: number) => Promise<void>;
   reorder: (bucket: Bucket, orderedIds: number[]) => Promise<void>;
   moveTask: (id: number, toDate: string | null) => Promise<void>;
+  scheduleTask: (id: number, startTime: string) => Promise<void>;
+  unscheduleTask: (id: number) => Promise<void>;
 }
 
 export const usePlanner = create<PlannerState>((set, get) => ({
@@ -99,6 +101,23 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     // Moving back to the backlog clears any timeline placement.
     if (!toDate) fields.scheduled_start = null;
     await repo.updateTask(id, fields);
+    await get().refresh();
+  },
+
+  scheduleTask: async (id, startTime) => {
+    const task = [...get().dayTasks, ...get().backlog].find((t) => t.id === id);
+    const fields: Record<string, string | number | null> = {
+      planned_date: get().selectedDate,
+      scheduled_start: startTime,
+    };
+    // A backlog task pulled onto the timeline becomes a planned task.
+    if (task?.status === "backlog") fields.status = "planned";
+    await repo.updateTask(id, fields);
+    await get().refresh();
+  },
+
+  unscheduleTask: async (id) => {
+    await repo.updateTask(id, { scheduled_start: null });
     await get().refresh();
   },
 }));

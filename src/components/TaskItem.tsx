@@ -5,7 +5,13 @@ import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { EstimatePicker } from "./EstimatePicker";
 
-export function TaskItem({ task }: { task: Task }) {
+export function TaskItem({
+  task,
+  bucket,
+}: {
+  task: Task;
+  bucket: "day" | "backlog";
+}) {
   const editTask = usePlanner((s) => s.editTask);
   const toggleComplete = usePlanner((s) => s.toggleComplete);
   const removeTask = usePlanner((s) => s.removeTask);
@@ -13,9 +19,12 @@ export function TaskItem({ task }: { task: Task }) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(task.title);
   const [showNotes, setShowNotes] = useState(false);
+  // JS-driven hover: WKWebView leaves CSS :hover stuck after a drag, so
+  // group-hover reveals become unreliable. Pointer events stay reliable.
+  const [hovered, setHovered] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: task.id });
+    useSortable({ id: task.id, data: { type: "task", bucket, task } });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -38,14 +47,22 @@ export function TaskItem({ task }: { task: Task }) {
     <li
       ref={setNodeRef}
       style={style}
-      className="group rounded-lg border border-transparent bg-white px-1.5 py-1.5 hover:border-neutral-200 hover:shadow-sm"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className={
+        "rounded-lg border bg-white px-1.5 py-1.5 " +
+        (hovered ? "border-neutral-200 shadow-sm" : "border-transparent")
+      }
     >
       <div className="flex items-center gap-2">
         <button
           {...attributes}
           {...listeners}
           aria-label="Drag to reorder"
-          className="cursor-grab text-neutral-300 opacity-0 group-hover:opacity-100"
+          className={
+            "cursor-grab text-neutral-300 transition-opacity " +
+            (hovered ? "opacity-100" : "opacity-0")
+          }
         >
           ⠿
         </button>
@@ -85,18 +102,27 @@ export function TaskItem({ task }: { task: Task }) {
           </span>
         )}
 
-        <div className="ml-auto flex items-center gap-0.5">
+        <div className="ml-auto flex items-center gap-1">
+          {/* Fixed-width slots keep the time and estimate columns aligned
+              across rows regardless of value width or scheduling. */}
+          <div className="flex w-14 justify-end">
+            {task.scheduled_start && (
+              <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-neutral-500">
+                {task.scheduled_start}
+              </span>
+            )}
+          </div>
           <EstimatePicker
             value={task.estimate_minutes}
+            revealed={hovered}
             onChange={(v) => editTask(task.id, { estimate_minutes: v })}
           />
           <button
             aria-label="Toggle notes"
             onClick={() => setShowNotes((s) => !s)}
             className={
-              task.notes
-                ? "rounded px-1 text-xs text-neutral-500 hover:bg-neutral-100"
-                : "rounded px-1 text-xs text-neutral-400 opacity-0 hover:bg-neutral-100 group-hover:opacity-100"
+              "w-5 rounded text-center text-xs hover:bg-neutral-100 " +
+              (task.notes || hovered ? "text-neutral-500" : "text-neutral-400 opacity-0")
             }
           >
             ☰
@@ -104,7 +130,10 @@ export function TaskItem({ task }: { task: Task }) {
           <button
             aria-label="Delete task"
             onClick={() => removeTask(task.id)}
-            className="rounded px-1 text-xs text-neutral-400 opacity-0 hover:bg-red-50 hover:text-red-500 group-hover:opacity-100"
+            className={
+              "w-5 rounded text-center text-xs text-neutral-400 hover:bg-red-50 hover:text-red-500 " +
+              (hovered ? "opacity-100" : "opacity-0")
+            }
           >
             ✕
           </button>

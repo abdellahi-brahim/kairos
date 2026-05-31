@@ -6,9 +6,11 @@ const PRESETS = [15, 30, 45, 60, 90, 120];
 interface EstimatePickerProps {
   value: number | null;
   onChange: (minutes: number | null) => void;
+  // Reveal the empty-state "+ est" affordance (driven by the row's JS hover).
+  revealed?: boolean;
 }
 
-export function EstimatePicker({ value, onChange }: EstimatePickerProps) {
+export function EstimatePicker({ value, onChange, revealed }: EstimatePickerProps) {
   const [open, setOpen] = useState(false);
 
   const pick = (minutes: number | null) => {
@@ -22,8 +24,9 @@ export function EstimatePicker({ value, onChange }: EstimatePickerProps) {
         onClick={() => setOpen((o) => !o)}
         className={
           value != null
-            ? "rounded-md bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-600 hover:bg-indigo-100"
-            : "rounded-md px-1.5 py-0.5 text-xs text-neutral-400 opacity-0 hover:bg-neutral-100 group-hover:opacity-100"
+            ? "block w-11 rounded-md bg-indigo-50 px-1.5 py-0.5 text-center text-xs font-medium text-indigo-600 hover:bg-indigo-100"
+            : "block w-11 rounded-md px-1.5 py-0.5 text-center text-xs text-neutral-400 hover:bg-neutral-100 " +
+              (revealed || open ? "opacity-100" : "opacity-0")
         }
       >
         {value != null ? formatDuration(value) : "+ est"}
