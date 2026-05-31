@@ -52,6 +52,11 @@ export function PlannerBoard() {
   const moveTask = usePlanner((s) => s.moveTask);
 
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [activeBlock, setActiveBlock] = useState<{
+    task: Task;
+    width: number;
+    height: number;
+  } | null>(null);
   const [preview, setPreview] = useState<DropPreview | null>(null);
 
   // Small threshold so taps on a row's controls still register as clicks.
@@ -64,8 +69,17 @@ export function PlannerBoard() {
 
   const onDragStart = (e: DragStartEvent) => {
     const data = e.active.data.current as DragData | undefined;
-    // Only list rows use the floating preview; timeline blocks move themselves.
+    // List rows and timeline blocks both render through the DragOverlay so the
+    // real nodes are never transformed (blocks own their own top/height).
     setActiveTask(data?.type === "task" ? data.task : null);
+    if (data?.type === "block") {
+      const r = e.active.rect.current.initial;
+      setActiveBlock({
+        task: data.task,
+        width: r?.width ?? 220,
+        height: r?.height ?? 30,
+      });
+    }
     // WKWebView will not repaint the pressed element's cursor mid-drag, so a
     // global cursor manager paints `grabbing` document-wide for the whole move.
     dragCursor.begin("move");
@@ -73,6 +87,7 @@ export function PlannerBoard() {
 
   const endDrag = () => {
     setActiveTask(null);
+    setActiveBlock(null);
     setPreview(null);
     dragCursor.end();
   };
@@ -190,6 +205,13 @@ export function PlannerBoard() {
         {activeTask ? (
           <div className="rounded-md border border-neutral-300 bg-white px-2 py-1 text-sm text-neutral-800 shadow-lg">
             {activeTask.title}
+          </div>
+        ) : activeBlock ? (
+          <div
+            style={{ width: activeBlock.width, height: activeBlock.height }}
+            className="overflow-hidden rounded-md border border-indigo-300 bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-900 shadow-lg"
+          >
+            {activeBlock.task.title}
           </div>
         ) : null}
       </DragOverlay>

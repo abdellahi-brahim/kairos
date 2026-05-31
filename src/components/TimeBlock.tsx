@@ -1,6 +1,5 @@
 import { useState, type CSSProperties, type PointerEvent } from "react";
 import { useDraggable } from "@dnd-kit/core";
-import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration } from "../lib/date";
@@ -25,7 +24,7 @@ export function TimeBlock({ task }: { task: Task }) {
 
   // Distinct from the list row's sortable id (task.id): a scheduled task exists
   // in both the list and the timeline, and dnd-kit ids must be unique.
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
+  const { attributes, listeners, setNodeRef, isDragging } =
     useDraggable({ id: `block-${task.id}`, data: { type: "block", task } });
 
   // Live duration while dragging the resize handle (committed on pointer up).
@@ -76,13 +75,24 @@ export function TimeBlock({ task }: { task: Task }) {
     window.addEventListener("pointercancel", cancel);
   };
 
+  // Move is rendered by the DragOverlay in PlannerBoard; the source node stays
+  // put (no transform) so dnd-kit's layout-shift compensation never fights the
+  // top/height we own here (which caused an accumulating offset after resizes).
+  const onMovePointerDown = (e: PointerEvent) => {
+    // Forward to dnd-kit's own pointerdown (we override it to add our handler).
+    listeners?.onPointerDown?.(e);
+    // Paint the grabbing cursor immediately on press (dnd's onDragStart only
+    // fires after the 4px activation distance). Clear it if the press is just a
+    // click that never becomes a drag.
+    dragCursor.begin("move");
+    window.addEventListener("pointerup", () => dragCursor.end(), { once: true });
+  };
+
   const done = task.status === "done";
   const style: CSSProperties = {
     top: topForMinutes(startMin),
     height: shownDuration * PX_PER_MIN,
-    transform: CSS.Translate.toString(transform),
-    // Move the real block so its size/proportion is preserved while dragging.
-    opacity: isDragging ? 0.75 : 1,
+    opacity: isDragging ? 0.3 : 1,
     zIndex: isDragging ? 30 : 10,
   };
 
@@ -92,6 +102,7 @@ export function TimeBlock({ task }: { task: Task }) {
       style={style}
       {...attributes}
       {...listeners}
+      onPointerDown={onMovePointerDown}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       title="Drag to move"

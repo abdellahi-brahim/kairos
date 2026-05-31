@@ -20,12 +20,12 @@ type CursorKind = "move" | "resize";
 
 const STYLE_ID = "dp-drag-cursor";
 
-// The cursor to paint for each gesture kind. Hand-for-everything is the
-// simplest consistent choice; resize uses ns-resize since the grip only moves
-// vertically. Both are held for the entire gesture.
+// The cursor to paint for each gesture kind. Hand-for-everything: once you have
+// engaged a block (move or resize) you are holding it, so both show grabbing,
+// held for the entire gesture.
 const CURSOR_FOR_KIND: Record<CursorKind, string> = {
   move: "grabbing",
-  resize: "ns-resize",
+  resize: "grabbing",
 };
 
 let activeKind: CursorKind | null = null;
@@ -42,17 +42,16 @@ function styleEl(): HTMLStyleElement {
 }
 
 // Install one-time, document-wide listeners that force-clear the global cursor
-// no matter how a gesture ends. These are the safety net against stuck state.
+// ONLY when a gesture is abandoned without its owner ending it. The gesture
+// owner (dnd-kit's onDragEnd/onDragCancel, or the resize handler's own
+// pointerup/pointercancel) is responsible for calling end() on normal
+// completion. We deliberately do NOT clear on a global pointerup/pointercancel
+// here: WKWebView can fire a spurious pointercancel mid-gesture, and a global
+// listener clearing on it would wipe the cursor of an in-flight resize. These
+// nets only catch focus loss, tab hide, and module hot-replace.
 function installSafetyNets() {
   if (safetyNetsInstalled) return;
   safetyNetsInstalled = true;
-
-  // A real release/cancel always clears, even if the component-level handler
-  // was torn down (HMR) before it could call end().
-  window.addEventListener("pointerup", end, true);
-  window.addEventListener("pointercancel", end, true);
-  // Losing focus (alt-tab, cmd-tab) or hiding the tab means we will not see the
-  // pointerup, so clear defensively.
   window.addEventListener("blur", end, true);
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") end();
