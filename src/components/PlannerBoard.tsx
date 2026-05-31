@@ -20,6 +20,7 @@ import { TaskList } from "./TaskList";
 import { AddTask } from "./AddTask";
 import { CarryOverStrip } from "./CarryOverStrip";
 import { Timeline, type DropPreview } from "./Timeline";
+import * as dragCursor from "../lib/dragCursor";
 
 interface DragData {
   type: "task" | "block";
@@ -65,6 +66,15 @@ export function PlannerBoard() {
     const data = e.active.data.current as DragData | undefined;
     // Only list rows use the floating preview; timeline blocks move themselves.
     setActiveTask(data?.type === "task" ? data.task : null);
+    // WKWebView will not repaint the pressed element's cursor mid-drag, so a
+    // global cursor manager paints `grabbing` document-wide for the whole move.
+    dragCursor.begin("move");
+  };
+
+  const endDrag = () => {
+    setActiveTask(null);
+    setPreview(null);
+    dragCursor.end();
   };
 
   const onDragOver = (e: DragOverEvent) => {
@@ -81,8 +91,7 @@ export function PlannerBoard() {
   };
 
   const onDragEnd = (e: DragEndEvent) => {
-    setActiveTask(null);
-    setPreview(null);
+    endDrag();
     const { active, over } = e;
     const aData = active.data.current as DragData | undefined;
     const oData = over?.data.current as
@@ -130,10 +139,7 @@ export function PlannerBoard() {
       onDragStart={onDragStart}
       onDragOver={onDragOver}
       onDragEnd={onDragEnd}
-      onDragCancel={() => {
-        setActiveTask(null);
-        setPreview(null);
-      }}
+      onDragCancel={endDrag}
     >
       <div className="flex flex-1 overflow-hidden">
         {/* Planning panel */}

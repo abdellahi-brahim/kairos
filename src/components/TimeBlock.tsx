@@ -4,6 +4,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration } from "../lib/date";
+import * as dragCursor from "../lib/dragCursor";
 import {
   DAY_END_MIN,
   DEFAULT_BLOCK_MIN,
@@ -32,12 +33,18 @@ export function TimeBlock({ task }: { task: Task }) {
   const shownDuration = resizeMin ?? duration;
   // JS hover (WKWebView leaves CSS :hover stuck after pointer interactions).
   const [hovered, setHovered] = useState(false);
+  const [handleHover, setHandleHover] = useState(false);
 
   const onResizeStart = (e: PointerEvent) => {
     e.stopPropagation();
     e.preventDefault();
     const startY = e.clientY;
+    // WKWebView will not repaint the pressed element's cursor mid-press, so paint
+    // ns-resize document-wide for the whole resize via the global manager.
+    dragCursor.begin("resize");
     const move = (ev: globalThis.PointerEvent) => {
+      // Size from the absolute pointer delta since start (not accumulated
+      // per-event deltas) so coalesced/dropped events don't cause drift.
       const delta = (ev.clientY - startY) / PX_PER_MIN;
       const next = Math.max(
         SNAP_MIN,
@@ -45,9 +52,14 @@ export function TimeBlock({ task }: { task: Task }) {
       );
       setResizeMin(next);
     };
-    const up = () => {
+    const cleanup = () => {
       window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointerup", commit);
+      window.removeEventListener("pointercancel", cancel);
+      dragCursor.end();
+    };
+    const commit = () => {
+      cleanup();
       setResizeMin((cur) => {
         if (cur != null && cur !== duration) {
           editTask(task.id, { estimate_minutes: cur });
@@ -55,8 +67,13 @@ export function TimeBlock({ task }: { task: Task }) {
         return null;
       });
     };
+    const cancel = () => {
+      cleanup();
+      setResizeMin(null); // discard the in-progress resize
+    };
     window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
+    window.addEventListener("pointerup", commit);
+    window.addEventListener("pointercancel", cancel);
   };
 
   const done = task.status === "done";
@@ -77,8 +94,13 @@ export function TimeBlock({ task }: { task: Task }) {
       {...listeners}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      title="Drag to move"
       className={
-        "absolute left-14 right-2 cursor-grab overflow-hidden rounded-md border px-2 py-1 text-left shadow-sm " +
+        // Hover affordance only. The active move cursor (grabbing) is painted
+        // document-wide by the global drag-cursor manager, because WKWebView
+        // will not repaint this element's cursor once the pointer is pressed.
+        "absolute left-14 right-2 cursor-grab touch-none select-none overflow-hidden rounded-md border px-2 py-1 text-left shadow-sm " +
+        (handleHover ? "ring-1 ring-indigo-300 " : "") +
         (done
           ? "border-neutral-200 bg-neutral-100 text-neutral-400"
           : "border-indigo-200 bg-indigo-50 text-indigo-900")
@@ -114,10 +136,24 @@ export function TimeBlock({ task }: { task: Task }) {
         </div>
       )}
 
+      {/* Resize zone: distinct cursor + a grip that appears on hover so it
+          reads as "resize" rather than "move". */}
       <div
         onPointerDown={onResizeStart}
-        className="absolute inset-x-0 bottom-0 h-2 cursor-ns-resize"
-      />
+        onMouseEnter={() => setHandleHover(true)}
+        onMouseLeave={() => setHandleHover(false)}
+        title="Drag edge to resize"
+        className="absolute inset-x-0 bottom-0 flex h-2.5 cursor-ns-resize items-end justify-center pb-0.5"
+      >
+        {(hovered || handleHover) && (
+          <div
+            className={
+              "h-1 w-6 rounded-full transition-colors " +
+              (handleHover ? "bg-indigo-500" : "bg-indigo-300")
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }
