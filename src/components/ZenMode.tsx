@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePlanner } from "../store";
 import type { Task } from "../types";
 import { formatDuration, todayKey } from "../lib/date";
@@ -42,17 +42,21 @@ export function ZenMode() {
   // its task but widened to the week map).
   const task = usePlanner((s) => resolveFocusTask(s));
   const subtasks = usePlanner((s) => s.focusSubtasks);
-  // Adjacency for muting Prev/Next: build the same scheduled queue the store
-  // uses, then check whether an adjacent item exists. Mirrors buildFocusQueue;
-  // kept here (a small selector) so the buttons can visually reflect state.
-  const { hasPrev, hasNext } = usePlanner((s) => {
-    if (s.focusTaskId == null) return { hasPrev: false, hasNext: false };
-    // Zen always walks the CURRENT day's scheduled tasks (mirrors the store's
-    // buildFocusQueue). A focused task not in today's queue gets index -1, so
-    // Next jumps to today's first block and Prev is off.
+  // Slices needed to derive Prev/Next adjacency. Selected individually (stable
+  // references) so the store selector never returns a fresh object, which would
+  // fail zustand's identity check and loop ("getSnapshot should be cached").
+  const weekTasks = usePlanner((s) => s.weekTasks);
+  const dayTasks = usePlanner((s) => s.dayTasks);
+  const selectedDate = usePlanner((s) => s.selectedDate);
+  // Adjacency for muting Prev/Next, derived in render (mirrors the store's
+  // buildFocusQueue). Zen always walks the CURRENT day's scheduled tasks; a
+  // focused task not in today's queue gets index -1, so Next jumps to today's
+  // first block and Prev is off.
+  const { hasPrev, hasNext } = useMemo(() => {
+    if (focusTaskId == null) return { hasPrev: false, hasNext: false };
     const today = todayKey();
-    let dayList = s.weekTasks[today];
-    if (dayList == null && today === s.selectedDate) dayList = s.dayTasks;
+    let dayList = weekTasks[today];
+    if (dayList == null && today === selectedDate) dayList = dayTasks;
     if (dayList == null) dayList = [];
     const queue = dayList
       .filter((t) => t.scheduled_start != null)
@@ -60,13 +64,13 @@ export function ZenMode() {
         (a, b) =>
           timeToMinutes(a.scheduled_start!) - timeToMinutes(b.scheduled_start!),
       );
-    const index = queue.findIndex((t) => t.id === s.focusTaskId);
+    const index = queue.findIndex((t) => t.id === focusTaskId);
     if (index === -1) {
       // Unscheduled entry: Next jumps to the first scheduled item, Prev is off.
       return { hasPrev: false, hasNext: queue.length > 0 };
     }
     return { hasPrev: index > 0, hasNext: index < queue.length - 1 };
-  });
+  }, [focusTaskId, weekTasks, dayTasks, selectedDate]);
   const closeFocus = usePlanner((s) => s.closeFocus);
   const focusNext = usePlanner((s) => s.focusNext);
   const focusPrev = usePlanner((s) => s.focusPrev);
