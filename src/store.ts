@@ -3,8 +3,22 @@ import type { Comment, Subtask, Task } from "./types";
 import * as repo from "./db";
 import { dayRange, shiftDay, todayKey } from "./lib/date";
 import { timeToMinutes } from "./lib/timeline";
+import * as prefs from "./lib/prefs";
 
 type Bucket = "day" | "backlog";
+
+// Side-panel UI preferences (single device, persisted in localStorage, not
+// SQLite). Defaults match the panels' previous hardcoded widths so existing
+// users see no jump on first load. Widths are clamped on every write.
+export const INBOX_DEFAULT_WIDTH = 224; // was w-56
+export const TIMELINE_DEFAULT_WIDTH = 300; // was w-[300px]
+const INBOX_MIN_WIDTH = 200;
+const INBOX_MAX_WIDTH = 420;
+const TIMELINE_MIN_WIDTH = 240;
+const TIMELINE_MAX_WIDTH = 520;
+
+const clamp = (px: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, Math.round(px)));
 
 // The week strip loads a window of days. To make overdue/carry-over tasks
 // reachable by simply scrolling left (we deliberately do not build a dedicated
@@ -128,10 +142,21 @@ function buildFocusQueue(
 }
 
 interface PlannerState {
+  // Left-hand Inbox panel collapse state. Mirrors the Timeline collapse: a thin
+  // rail when collapsed, full panel when expanded. Persisted to localStorage.
+  inboxCollapsed: boolean;
+  toggleInbox: () => void;
+
   // Right-hand Timeline panel collapse state. The week strip takes the full
-  // width when collapsed; default is expanded.
+  // width when collapsed; default is expanded. Persisted to localStorage.
   timelineCollapsed: boolean;
   toggleTimeline: () => void;
+
+  // Persisted panel widths (px). Setters clamp to each panel's allowed range.
+  inboxWidth: number;
+  setInboxWidth: (px: number) => void;
+  timelineWidth: number;
+  setTimelineWidth: (px: number) => void;
 
   selectedDate: string;
   dayTasks: Task[];
@@ -220,9 +245,45 @@ interface PlannerState {
 }
 
 export const usePlanner = create<PlannerState>((set, get) => ({
-  timelineCollapsed: false,
+  // UI prefs: read initial values from localStorage (defaults when absent),
+  // write back on every toggle/set so they survive reloads on this device.
+  inboxCollapsed: prefs.readBool("inboxCollapsed", false),
+  toggleInbox: () =>
+    set((s) => {
+      const next = !s.inboxCollapsed;
+      prefs.write("inboxCollapsed", next);
+      return { inboxCollapsed: next };
+    }),
+
+  timelineCollapsed: prefs.readBool("timelineCollapsed", false),
   toggleTimeline: () =>
-    set((s) => ({ timelineCollapsed: !s.timelineCollapsed })),
+    set((s) => {
+      const next = !s.timelineCollapsed;
+      prefs.write("timelineCollapsed", next);
+      return { timelineCollapsed: next };
+    }),
+
+  inboxWidth: clamp(
+    prefs.readNumber("inboxWidth", INBOX_DEFAULT_WIDTH),
+    INBOX_MIN_WIDTH,
+    INBOX_MAX_WIDTH,
+  ),
+  setInboxWidth: (px) => {
+    const next = clamp(px, INBOX_MIN_WIDTH, INBOX_MAX_WIDTH);
+    prefs.write("inboxWidth", next);
+    set({ inboxWidth: next });
+  },
+
+  timelineWidth: clamp(
+    prefs.readNumber("timelineWidth", TIMELINE_DEFAULT_WIDTH),
+    TIMELINE_MIN_WIDTH,
+    TIMELINE_MAX_WIDTH,
+  ),
+  setTimelineWidth: (px) => {
+    const next = clamp(px, TIMELINE_MIN_WIDTH, TIMELINE_MAX_WIDTH);
+    prefs.write("timelineWidth", next);
+    set({ timelineWidth: next });
+  },
 
   selectedDate: todayKey(),
   dayTasks: [],

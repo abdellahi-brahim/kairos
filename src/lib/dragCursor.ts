@@ -16,16 +16,18 @@
 // pointercancel, window blur, tab visibility change, and HMR dispose. None of
 // those depend on a component lifecycle, so the cursor can never get stuck.
 
-type CursorKind = "move" | "resize";
+type CursorKind = "move" | "resize" | "resize-col";
 
 const STYLE_ID = "dp-drag-cursor";
 
-// The cursor to paint for each gesture kind. Hand-for-everything: once you have
-// engaged a block (move or resize) you are holding it, so both show grabbing,
-// held for the entire gesture.
+// The cursor to paint for each gesture kind. Block move/resize show grabbing
+// (once you have engaged a block you are holding it). A panel splitter drag is a
+// horizontal resize, so it paints the native col-resize cursor for the whole
+// gesture (WKWebView will not repaint the pressed element's cursor mid-press).
 const CURSOR_FOR_KIND: Record<CursorKind, string> = {
   move: "grabbing",
   resize: "grabbing",
+  "resize-col": "col-resize",
 };
 
 let activeKind: CursorKind | null = null;

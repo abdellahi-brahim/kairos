@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -19,7 +19,11 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import type { Task } from "../types";
-import { usePlanner } from "../store";
+import {
+  usePlanner,
+  INBOX_DEFAULT_WIDTH,
+  TIMELINE_DEFAULT_WIDTH,
+} from "../store";
 import { formatDuration, prettyDate, relativeLabel, shiftDay, todayKey } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
 import {
@@ -101,20 +105,130 @@ function pickFocusDayStart(tasks: Task[]): number | null {
   return candidates[0].id;
 }
 
+// A thin vertical drag handle that sits on a panel's inner edge and resizes it.
+// It is a PLAIN pointer handler, not a dnd-kit node: stopPropagation +
+// preventDefault on pointerdown keep the DndContext PointerSensor from ever
+// starting a drag from it. Sizing mirrors TimeBlock's resize: record the start
+// clientX + the panel's current width, then size from the ABSOLUTE pointer
+// delta since start (not accumulated per-event deltas) so coalesced/dropped
+// events never drift. `side` says which edge the handle is on, which sets the
+// delta sign: the Inbox grows when its right edge moves right (+), the Timeline
+// grows when its left edge moves left (-). `onResizingChange` lets the panel
+// suppress its width transition for the duration of the live drag.
+function PanelSplitter({
+  side,
+  width,
+  setWidth,
+  defaultWidth,
+  onResizingChange,
+}: {
+  side: "right" | "left";
+  width: number;
+  setWidth: (px: number) => void;
+  defaultWidth: number;
+  onResizingChange: (resizing: boolean) => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+
+  const onPointerDown = (e: PointerEvent) => {
+    // Block the dnd-kit PointerSensor and any default text-selection drag.
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    onResizingChange(true);
+    dragCursor.begin("resize-col");
+    const move = (ev: globalThis.PointerEvent) => {
+      const delta = ev.clientX - startX;
+      // Inbox (handle on the right): drag right grows it. Timeline (handle on
+      // the left): drag left grows it, so the sign is inverted. The store
+      // setter clamps to the panel's allowed range.
+      const next = side === "right" ? startWidth + delta : startWidth - delta;
+      setWidth(next);
+    };
+    const cleanup = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", cleanup);
+      window.removeEventListener("pointercancel", cleanup);
+      dragCursor.end();
+      onResizingChange(false);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", cleanup);
+    window.addEventListener("pointercancel", cleanup);
+  };
+
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      onDoubleClick={() => setWidth(defaultWidth)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      title="Drag to resize (double-click to reset)"
+      className={
+        "absolute inset-y-0 z-20 flex w-1.5 cursor-col-resize touch-none select-none justify-center " +
+        (side === "right" ? "-right-0.5" : "-left-0.5")
+      }
+    >
+      {/* Faint indigo line revealed on JS hover (CSS :hover sticks in WKWeb
+          WebView after a drag), matching the timeline's hover affordances. */}
+      <div
+        className={
+          "h-full w-px bg-indigo-400 transition-opacity " +
+          (hovered ? "opacity-100" : "opacity-0")
+        }
+      />
+    </div>
+  );
+}
+
 // The pinned Inbox column on the far left (does not scroll with the week strip).
+// Collapsible (mirrors TimelinePanel) and resizable from its right edge. The
+// width animates on collapse/expand but the transition is suppressed during a
+// live splitter drag so the edge tracks the pointer with no lag.
 function InboxColumn({ tasks }: { tasks: Task[] }) {
   const addToBacklog = usePlanner((s) => s.addToBacklog);
+  const collapsed = usePlanner((s) => s.inboxCollapsed);
+  const toggle = usePlanner((s) => s.toggleInbox);
+  const width = usePlanner((s) => s.inboxWidth);
+  const setWidth = usePlanner((s) => s.setInboxWidth);
+  const [resizing, setResizing] = useState(false);
   const { setNodeRef, isOver } = useDroppable({
     id: "col-inbox",
     data: { type: "column", date: null },
   });
 
+  if (collapsed) {
+    // A thin rail; the chevron points right because the panel expands rightward.
+    return (
+      <aside className="flex w-7 shrink-0 flex-col items-center border-r border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out">
+        <button
+          onClick={toggle}
+          title="Expand inbox"
+          className="flex h-7 w-7 items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+        >
+          ›
+        </button>
+      </aside>
+    );
+  }
+
   return (
-    <section className="flex w-56 shrink-0 flex-col border-r border-neutral-200 bg-white">
-      <div className="border-b border-neutral-200 px-2 py-1">
+    <section
+      style={{ width, transition: resizing ? "none" : undefined }}
+      className="relative flex shrink-0 flex-col border-r border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out"
+    >
+      <div className="flex items-center justify-between border-b border-neutral-200 px-2 py-1">
         <h2 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
           Inbox
         </h2>
+        <button
+          onClick={toggle}
+          title="Collapse inbox"
+          className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+        >
+          ‹
+        </button>
       </div>
       <div
         ref={setNodeRef}
@@ -148,15 +262,26 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
           <AddTask placeholder="+ add to inbox" onAdd={addToBacklog} />
         </div>
       </div>
+      <PanelSplitter
+        side="right"
+        width={width}
+        setWidth={setWidth}
+        defaultWidth={INBOX_DEFAULT_WIDTH}
+        onResizingChange={setResizing}
+      />
     </section>
   );
 }
 
-// The collapsible right-hand Timeline panel for the selected day.
+// The collapsible right-hand Timeline panel for the selected day. Resizable from
+// its left edge; width animates on collapse/expand, suppressed during live drag.
 function TimelinePanel({ preview }: { preview: DropPreview | null }) {
   const selectedDate = usePlanner((s) => s.selectedDate);
   const collapsed = usePlanner((s) => s.timelineCollapsed);
   const toggle = usePlanner((s) => s.toggleTimeline);
+  const width = usePlanner((s) => s.timelineWidth);
+  const setWidth = usePlanner((s) => s.setTimelineWidth);
+  const [resizing, setResizing] = useState(false);
 
   const rel = relativeLabel(selectedDate);
   const label = rel ? `${rel} · ${prettyDate(selectedDate)}` : prettyDate(selectedDate);
@@ -164,7 +289,7 @@ function TimelinePanel({ preview }: { preview: DropPreview | null }) {
   if (collapsed) {
     // A thin rail so the week strip gets full width; the chevron re-expands.
     return (
-      <aside className="flex w-7 shrink-0 flex-col items-center border-l border-neutral-200 bg-white">
+      <aside className="flex w-7 shrink-0 flex-col items-center border-l border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out">
         <button
           onClick={toggle}
           title="Expand timeline"
@@ -177,7 +302,17 @@ function TimelinePanel({ preview }: { preview: DropPreview | null }) {
   }
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col border-l border-neutral-200 bg-white">
+    <aside
+      style={{ width, transition: resizing ? "none" : undefined }}
+      className="relative flex shrink-0 flex-col border-l border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out"
+    >
+      <PanelSplitter
+        side="left"
+        width={width}
+        setWidth={setWidth}
+        defaultWidth={TIMELINE_DEFAULT_WIDTH}
+        onResizingChange={setResizing}
+      />
       <div className="flex items-center justify-between border-b border-neutral-200 px-2 py-1">
         <h2 className="truncate text-[11px] font-semibold text-neutral-700">
           {label}
