@@ -35,6 +35,7 @@ import { TaskItem } from "./TaskItem";
 import { AddTask } from "./AddTask";
 import { Timeline, type DropPreview } from "./Timeline";
 import { BlockCard, blockSurfaceClass } from "./BlockCard";
+import { InsertionContext, type Insertion } from "./InsertionContext";
 import * as dragCursor from "../lib/dragCursor";
 
 // While moving a timeline block, lock it to the vertical axis and snap to the
@@ -191,6 +192,10 @@ export function PlannerShell() {
     height: number;
   } | null>(null);
   const [preview, setPreview] = useState<DropPreview | null>(null);
+  // Within-column reorder marker: which row the insertion line sits on and which
+  // edge. Set in onDragOver, cleared on drag end/cancel. Provided to TaskItem via
+  // InsertionContext. Null for cross-column moves (those use the zone highlight).
+  const [insertion, setInsertion] = useState<Insertion | null>(null);
 
   // Guards against firing overlapping range extensions while one is in flight.
   const extending = useRef(false);
@@ -261,12 +266,15 @@ export function PlannerShell() {
     setActiveTask(null);
     setActiveBlock(null);
     setPreview(null);
+    setInsertion(null);
     dragCursor.end();
   };
 
   const onDragOver = (e: DragOverEvent) => {
     const a = e.active.data.current as DragData | undefined;
-    const o = e.over?.data.current as { type?: string; time?: string } | undefined;
+    const o = e.over?.data.current as
+      | { type?: string; time?: string; column?: string }
+      | undefined;
     // Show the dashed landing ghost only when dragging a list/column task onto a
     // timeline slot. A block move shows the moving card itself.
     if (a?.type === "task" && o?.type === "slot" && o.time) {
@@ -276,6 +284,32 @@ export function PlannerShell() {
       });
     } else {
       setPreview(null);
+    }
+
+    // Within-column reorder: active and over are both task rows in the SAME
+    // column. Draw an explicit insertion line at the drop point. Cross-column
+    // moves (different column, or over a container) fall back to the existing
+    // zone highlight only, so clear any line here.
+    if (
+      a?.type === "task" &&
+      o?.type === "task" &&
+      o.column &&
+      a.column === o.column &&
+      e.active.id !== e.over?.id
+    ) {
+      // Edge is derived from the relative order of the dragged row and the row
+      // it is over: dragging downward past a row lands below it, dragging up
+      // lands above it. This matches where arrayMove will drop the row.
+      const list =
+        a.column === "inbox" ? backlog : weekTasks[a.column] ?? [];
+      const ids = list.map((t) => t.id);
+      const from = ids.indexOf(Number(e.active.id));
+      const to = ids.indexOf(Number(e.over!.id));
+      const edge: Insertion["edge"] =
+        from !== -1 && to !== -1 && from < to ? "below" : "above";
+      setInsertion({ taskId: Number(e.over!.id), edge });
+    } else {
+      setInsertion(null);
     }
   };
 
@@ -372,6 +406,7 @@ export function PlannerShell() {
         onDragEnd={onDragEnd}
         onDragCancel={endDrag}
       >
+        <InsertionContext.Provider value={insertion}>
         <div className="flex flex-1 overflow-hidden">
           {/* LEFT: pinned Inbox (outside the horizontal scroll). */}
           <InboxColumn tasks={backlog} />
@@ -400,6 +435,7 @@ export function PlannerShell() {
           {/* RIGHT: collapsible Timeline panel for the selected day. */}
           <TimelinePanel preview={preview} />
         </div>
+        </InsertionContext.Provider>
 
         <DragOverlay
           dropAnimation={null}

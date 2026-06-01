@@ -114,7 +114,7 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
             {dayOfMonth(date)}
           </span>
           {isToday && (
-            <span className="rounded bg-indigo-500 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-white">
+            <span className="rounded bg-indigo-500 px-1 py-px text-[10px] font-medium uppercase tracking-wide text-white">
               Today
             </span>
           )}
@@ -136,7 +136,7 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
         {isToday && <OverdueBand />}
 
         <div className="mb-0.5 flex items-baseline justify-between px-1">
-          <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
             {open.length} open
           </span>
         </div>
@@ -185,10 +185,10 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
               onClick={() => setDoneOpen((v) => !v)}
               className="flex w-full items-center gap-1 px-1 py-0.5 text-left"
             >
-              <span className="text-[9px] leading-none text-neutral-400">
+              <span className="text-[10px] leading-none text-neutral-400">
                 {doneOpen ? "▾" : "▸"}
               </span>
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
                 Done ({done.length})
               </span>
             </button>

@@ -21,10 +21,10 @@ export function OverdueBand() {
           onClick={() => setExpanded((v) => !v)}
           className="flex min-w-0 items-center gap-1 text-left"
         >
-          <span className="text-[9px] leading-none text-rose-400">
+          <span className="text-[10px] leading-none text-rose-400">
             {expanded ? "▾" : "▸"}
           </span>
-          <span className="text-[9px] font-semibold uppercase tracking-wide text-rose-500">
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-rose-500">
             Overdue ({carryOver.length})
           </span>
         </button>

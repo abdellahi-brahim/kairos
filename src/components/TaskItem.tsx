@@ -7,16 +7,19 @@ import { formatDuration } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
 import { parseTags, tagColor } from "../lib/tags";
 import { htmlToPlainText } from "../lib/text";
+import { Checkbox } from "./Checkbox";
+import { useInsertion } from "./InsertionContext";
 
 // A dense, title-first task row shared by every column (Inbox + day columns).
 //
 // Layout (vertical flex): a title line where the title always wins for space and
 // wraps to up to 3 lines (line-clamp, never collapsing to "F..."), preceded only
-// by the small fixed-width controls (drag handle, checkbox, priority dot); an
-// optional muted notes snippet; then a compact, de-emphasized footer with all
-// secondary metadata (scheduled time, estimate, tags, tracked time, subtasks).
-// A bare task (no notes, no metadata) stays a tight near-single-line row; the
-// card only grows as content requires.
+// by the small fixed-width controls (drag handle, checkbox); priority shows as a
+// left-edge color rail on the card root, not an inline slot. An optional muted
+// notes snippet; then a compact, de-emphasized footer with all secondary
+// metadata (scheduled time, estimate, tags, tracked time, subtasks). A bare task
+// (no notes, no metadata) stays a tight near-single-line row; the card only grows
+// as content requires.
 export function TaskItem({
   task,
   bucket,
@@ -42,6 +45,10 @@ export function TaskItem({
   // JS-driven hover: WKWebView leaves CSS :hover stuck after a drag.
   const [hovered, setHovered] = useState(false);
 
+  // Within-column reorder marker: if this row is the insertion target, draw a
+  // 2px indigo line on the relevant edge. Provided by PlannerShell's DndContext.
+  const insertion = useInsertion();
+
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: task.id, data: { type: "task", bucket, column, task } });
   const style = {
@@ -54,6 +61,7 @@ export function TaskItem({
   const running = !!task.timer_started_at;
   const tags = parseTags(task.tags);
   const open = () => openDetail(task.id);
+  const meta = priorityMeta(task.priority);
 
   // Notes are rich-text HTML (TipTap). Strip to plain text for a safe preview;
   // render the snippet only when there is actual text after stripping.
@@ -69,6 +77,12 @@ export function TaskItem({
     task.actual_minutes > 0 ||
     (!!task.subtask_total && task.subtask_total > 0);
 
+  // Priority left rail: a 2px colored left border. border-left-color is more
+  // specific than the hover's generic border-color swap, so the rail color stays
+  // stable across hover (only the other sides + shadow emphasize). When priority
+  // is 0 there is no rail and the plain hairline left border applies.
+  const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
+
   return (
     <li
       ref={setNodeRef}
@@ -77,11 +91,24 @@ export function TaskItem({
       onMouseLeave={() => setHovered(false)}
       className={
         // Every card carries a visible border + white surface + padding so
-        // cards read as distinct units; hover just emphasizes.
-        "rounded-md border bg-white px-2 py-1.5 " +
-        (hovered ? "border-neutral-300 shadow-sm" : "border-neutral-200")
+        // cards read as distinct units; hover just emphasizes. relative so the
+        // insertion line can be absolutely positioned to span the row.
+        "relative rounded-md border bg-white px-2 py-1.5 " +
+        (hovered ? "border-neutral-300 shadow-sm" : "border-neutral-200") +
+        railClass
       }
     >
+      {/* Within-column reorder insertion line: a 2px indigo bar on the edge the
+          dragged row will land against. Tied to the active drag (cleared on
+          drag end/cancel), so it never lingers after drop. */}
+      {insertion && insertion.taskId === task.id && (
+        <span
+          className={
+            "pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded-full bg-indigo-500 " +
+            (insertion.edge === "above" ? "-top-0.5" : "-bottom-0.5")
+          }
+        />
+      )}
       {/* Title line: controls are fixed-width; the title flex-grows and wraps to
           up to 3 lines. Controls top-align so they sit on the first title line
           when it wraps. The h-5 wrappers keep them vertically centered on a
@@ -100,8 +127,7 @@ export function TaskItem({
         </button>
 
         <span className="flex h-5 shrink-0 items-center">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={done}
             onChange={() => {
               // Completing an open task lets the parent column animate the
@@ -110,26 +136,14 @@ export function TaskItem({
               if (!done && onComplete) onComplete(task);
               else toggleComplete(task);
             }}
-            className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
           />
         </span>
-
-        {task.priority > 0 && (
-          <span className="flex h-5 shrink-0 items-center">
-            <span
-              title={`${priorityMeta(task.priority).label} priority`}
-              className={
-                "h-1.5 w-1.5 rounded-full " + priorityMeta(task.priority).dot
-              }
-            />
-          </span>
-        )}
 
         <button
           onClick={open}
           title={task.title}
           className={
-            "min-w-0 flex-1 line-clamp-3 text-left text-[13px] leading-5 " +
+            "min-w-0 flex-1 line-clamp-3 text-left text-[13px] font-medium leading-5 " +
             (done ? "text-neutral-400 line-through" : "text-neutral-800")
           }
         >
@@ -152,7 +166,7 @@ export function TaskItem({
           task has notes. Indented to align under the title. Rich-text HTML is
           stripped to text (never rendered raw) by htmlToPlainText. */}
       {snippet && (
-        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[10px] leading-snug text-neutral-400">
+        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[11px] leading-snug text-neutral-400">
           {snippet}
         </p>
       )}
@@ -160,7 +174,7 @@ export function TaskItem({
       {/* Footer: compact, muted metadata. Indented to align under the title,
           shrinks/wraps rather than crowding the title above it. */}
       {hasMeta && (
-        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[10px] leading-none text-neutral-400">
+        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[11px] leading-none text-neutral-400">
           {task.scheduled_start && (
             <span className="tabular-nums text-neutral-500">
               {task.scheduled_start}

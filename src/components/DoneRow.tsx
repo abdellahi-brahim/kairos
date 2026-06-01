@@ -5,6 +5,7 @@ import { formatDuration } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
 import { parseTags, tagColor } from "../lib/tags";
 import { htmlToPlainText } from "../lib/text";
+import { Checkbox } from "./Checkbox";
 
 // A dense, read-only row for a column's collapsed "Done" group. Visually mirrors
 // TaskItem's done state but deliberately does NOT register a dnd sortable: done
@@ -24,6 +25,11 @@ export function DoneRow({ task }: { task: Task }) {
   const tags = parseTags(task.tags);
   const open = () => openDetail(task.id);
   const snippet = htmlToPlainText(task.notes);
+  const meta = priorityMeta(task.priority);
+
+  // Priority left rail, kept consistent with the open rows. border-left-color is
+  // more specific than the hover border-color swap, so the rail survives hover.
+  const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
 
   const hasMeta =
     task.estimate_minutes != null ||
@@ -38,34 +44,19 @@ export function DoneRow({ task }: { task: Task }) {
       onMouseLeave={() => setHovered(false)}
       className={
         "rounded-md border bg-white px-2 py-1.5 " +
-        (hovered ? "border-neutral-300 shadow-sm" : "border-neutral-200")
+        (hovered ? "border-neutral-300 shadow-sm" : "border-neutral-200") +
+        railClass
       }
     >
       <div className="flex items-start gap-1.5">
         <span className="flex h-5 shrink-0 items-center">
-          <input
-            type="checkbox"
-            checked
-            onChange={() => toggleComplete(task)}
-            className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
-          />
+          <Checkbox checked onChange={() => toggleComplete(task)} />
         </span>
-
-        {task.priority > 0 && (
-          <span className="flex h-5 shrink-0 items-center">
-            <span
-              title={`${priorityMeta(task.priority).label} priority`}
-              className={
-                "h-1.5 w-1.5 rounded-full " + priorityMeta(task.priority).dot
-              }
-            />
-          </span>
-        )}
 
         <button
           onClick={open}
           title={task.title}
-          className="min-w-0 flex-1 line-clamp-3 text-left text-[13px] leading-5 text-neutral-400 line-through"
+          className="min-w-0 flex-1 line-clamp-3 text-left text-[13px] font-medium leading-5 text-neutral-400 line-through"
         >
           {task.title}
         </button>
@@ -83,13 +74,13 @@ export function DoneRow({ task }: { task: Task }) {
       </div>
 
       {snippet && (
-        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[10px] leading-snug text-neutral-400">
+        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[11px] leading-snug text-neutral-400">
           {snippet}
         </p>
       )}
 
       {hasMeta && (
-        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[10px] leading-none text-neutral-400">
+        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[11px] leading-none text-neutral-400">
           {task.estimate_minutes != null && (
             <button
               onClick={open}

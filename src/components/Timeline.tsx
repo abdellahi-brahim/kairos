@@ -49,7 +49,7 @@ export function Timeline({ preview }: { preview: DropPreview | null }) {
           className="absolute inset-x-0 border-t border-neutral-100"
           style={{ top: topForMinutes(h * 60) }}
         >
-          <span className="absolute -top-2 left-0 w-12 pr-2 text-right text-[10px] text-neutral-400">
+          <span className="absolute -top-2 left-0 w-12 pr-2 text-right text-[10px] tabular-nums text-neutral-400">
             {String(h).padStart(2, "0")}:00
           </span>
         </div>
