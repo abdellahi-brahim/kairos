@@ -24,7 +24,7 @@ export function TagEditor({ value, onChange }: TagEditorProps) {
         <span
           key={t}
           className={
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium " +
+            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium " +
             tagColor(t)
           }
         >
@@ -50,7 +50,7 @@ export function TagEditor({ value, onChange }: TagEditorProps) {
           }
         }}
         placeholder="+ tag"
-        className="w-16 bg-transparent text-xs outline-none placeholder-neutral-400"
+        className="w-16 bg-transparent text-[11px] outline-none placeholder-neutral-400"
       />
     </div>
   );

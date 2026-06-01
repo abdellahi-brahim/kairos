@@ -14,7 +14,7 @@ export function PriorityPicker({ value, onChange }: PriorityPickerProps) {
           key={p.value}
           onClick={() => onChange(p.value)}
           className={
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-xs " +
+            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] " +
             (value === p.value
               ? "bg-white font-medium text-neutral-800 shadow-sm"
               : "text-neutral-500 hover:text-neutral-700")

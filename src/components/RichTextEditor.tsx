@@ -22,7 +22,7 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       className={
-        "rounded px-1.5 py-0.5 text-xs " +
+        "rounded px-1 py-0.5 text-[11px] leading-none " +
         (active
           ? "bg-neutral-200 text-neutral-900"
           : "text-neutral-500 hover:bg-neutral-100")
@@ -35,7 +35,7 @@ function ToolbarButton({
 
 function Toolbar({ editor }: { editor: Editor }) {
   return (
-    <div className="flex flex-wrap gap-0.5 border-b border-neutral-200 p-1">
+    <div className="flex flex-wrap gap-0.5 border-b border-neutral-200 px-1 py-0.5">
       <ToolbarButton
         active={editor.isActive("bold")}
         label="B"
@@ -85,7 +85,7 @@ export function RichTextEditor({
     content: initialValue || "",
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
     editorProps: {
-      attributes: { class: "rt-content px-3 py-2 focus:outline-none" },
+      attributes: { class: "rt-content px-2 py-1.5 focus:outline-none" },
     },
   });
 

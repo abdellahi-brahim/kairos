@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { usePlanner } from "../store";
+import { Checkbox } from "./Checkbox";
 
 export function SubtaskList() {
   const subtasks = usePlanner((s) => s.detailSubtasks);
@@ -19,7 +20,7 @@ export function SubtaskList() {
 
   return (
     <div>
-      <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-1.5 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
         Subtasks
         {subtasks.length > 0 && (
           <span className="font-medium tabular-nums text-neutral-400">
@@ -34,15 +35,10 @@ export function SubtaskList() {
             key={s.id}
             className="group flex items-center gap-2 rounded px-1 py-1 hover:bg-neutral-50"
           >
-            <input
-              type="checkbox"
-              checked={!!s.done}
-              onChange={() => toggleSubtask(s)}
-              className="h-4 w-4 shrink-0 cursor-pointer accent-indigo-500"
-            />
+            <Checkbox checked={!!s.done} onChange={() => toggleSubtask(s)} />
             <span
               className={
-                "flex-1 text-sm " +
+                "flex-1 text-[14px] " +
                 (s.done ? "text-neutral-400 line-through" : "text-neutral-700")
               }
             >
@@ -65,7 +61,7 @@ export function SubtaskList() {
           if (e.key === "Enter") submit();
         }}
         placeholder="Add a subtask…"
-        className="mt-1 w-full rounded-md border border-transparent bg-neutral-100 px-2 py-1.5 text-sm outline-none focus:border-neutral-300 focus:bg-white"
+        className="mt-1 w-full rounded-md border border-transparent bg-neutral-100 px-2 py-1 text-[14px] outline-none focus:border-neutral-300 focus:bg-white"
       />
     </div>
   );

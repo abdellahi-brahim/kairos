@@ -7,13 +7,26 @@ import { RichTextEditor } from "./RichTextEditor";
 import { SubtaskList } from "./SubtaskList";
 import { PriorityPicker } from "./PriorityPicker";
 import { TagEditor } from "./TagEditor";
+import { Checkbox } from "./Checkbox";
 
+// Inline metadata field: an 11px muted label next to its control. Matches the
+// dense footer scale on the cards.
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-xs text-neutral-400">{label}</span>
+      <span className="text-[11px] text-neutral-400">{label}</span>
       {children}
     </div>
+  );
+}
+
+// Section heading ("Description", "Subtasks", "Comments"): 11px muted semibold
+// uppercase, matching the column section labels.
+function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+      {children}
+    </h3>
   );
 }
 
@@ -79,17 +92,14 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
       onClick={doClose}
     >
       <div
-        className="mt-6 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl"
+        className="mt-6 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start gap-3 border-b border-neutral-200 p-4">
-          <input
-            type="checkbox"
-            checked={done}
-            onChange={() => toggleComplete(task)}
-            className="mt-1 h-5 w-5 shrink-0 cursor-pointer accent-indigo-500"
-          />
+        <div className="flex items-start gap-2 border-b border-neutral-200 px-4 py-2.5">
+          <span className="flex h-[26px] shrink-0 items-center">
+            <Checkbox checked={done} onChange={() => toggleComplete(task)} />
+          </span>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -98,23 +108,23 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
               if (e.key === "Enter") e.currentTarget.blur();
             }}
             className={
-              "flex-1 text-lg font-semibold outline-none " +
+              "flex-1 text-[18px] font-semibold leading-relaxed outline-none " +
               (done ? "text-neutral-400 line-through" : "text-neutral-800")
             }
           />
           <button
             onClick={doClose}
             aria-label="Close"
-            className="shrink-0 rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="mt-0.5 shrink-0 rounded p-1 text-[11px] leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
           >
             ✕
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {/* Metadata */}
-          <div className="mb-4 flex flex-wrap items-center gap-4">
+        <div className="flex-1 overflow-y-auto p-3">
+          {/* Metadata: a compact wrapped row of label+control fields. */}
+          <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
             <Meta label="Priority">
               <PriorityPicker
                 value={task.priority}
@@ -133,15 +143,11 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             </Meta>
             {task.scheduled_start && (
               <Meta label="Scheduled">
-                <span className="text-sm tabular-nums text-neutral-700">
+                <span className="text-[11px] tabular-nums text-neutral-700">
                   {task.scheduled_start}
                 </span>
               </Meta>
             )}
-          </div>
-
-          {/* Tags */}
-          <div className="mb-4">
             <Meta label="Tags">
               <TagEditor
                 value={task.tags}
@@ -151,7 +157,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
           </div>
 
           {/* Description */}
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-neutral-400">
+          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
             Description
           </label>
           <RichTextEditor
@@ -161,21 +167,22 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
           />
 
           {/* Subtasks */}
-          <div className="mt-6">
+          <div className="mt-4">
             <SubtaskList />
           </div>
 
           {/* Comments */}
-          <div className="mt-6">
-            <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-neutral-400">
-              Comments
-            </h3>
-            <ul className="flex flex-col gap-2">
+          <div className="mt-4">
+            <SectionLabel>Comments</SectionLabel>
+            <ul className="mt-2 flex flex-col gap-1.5">
               {comments.length === 0 && (
-                <p className="text-sm text-neutral-400">No comments yet.</p>
+                <p className="text-[14px] text-neutral-400">No comments yet.</p>
               )}
               {comments.map((c) => (
-                <li key={c.id} className="rounded-md bg-neutral-50 p-2 text-sm">
+                <li
+                  key={c.id}
+                  className="rounded-md bg-neutral-50 p-2 text-[14px]"
+                >
                   <div className="mb-0.5 flex items-center justify-between">
                     <span className="text-[10px] text-neutral-400">
                       {formatDateTime(c.created_at)}
@@ -203,11 +210,11 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
                 }}
                 placeholder="Write a comment… (⌘/Ctrl+Enter)"
                 rows={2}
-                className="flex-1 resize-y rounded-md border border-neutral-200 p-2 text-sm outline-none focus:border-neutral-300"
+                className="flex-1 resize-y rounded-md border border-neutral-200 p-2 text-[14px] outline-none focus:border-neutral-300"
               />
               <button
                 onClick={submitComment}
-                className="self-end rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-600"
+                className="self-end rounded-md bg-indigo-500 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-600"
               >
                 Add
               </button>
@@ -216,19 +223,19 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between border-t border-neutral-200 p-3">
+        <div className="flex justify-between border-t border-neutral-200 px-3 py-2">
           <button
             onClick={() => {
               removeTask(task.id);
               close();
             }}
-            className="text-sm text-red-500 hover:underline"
+            className="text-[11px] text-red-500 hover:underline"
           >
             Delete task
           </button>
           <button
             onClick={doClose}
-            className="rounded-md bg-neutral-100 px-3 py-1.5 text-sm text-neutral-700 hover:bg-neutral-200"
+            className="rounded-md bg-neutral-100 px-3 py-1.5 text-[11px] text-neutral-700 hover:bg-neutral-200"
           >
             Close
           </button>
