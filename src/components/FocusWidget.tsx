@@ -119,7 +119,7 @@ export function FocusWidget() {
         data-tauri-drag-region
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="flex w-full flex-col justify-between rounded-2xl border border-white/10 bg-neutral-900/85 px-3.5 py-2.5 text-neutral-100 shadow-[0_8px_30px_rgba(0,0,0,0.55)] backdrop-blur-xl"
+        className="flex w-full flex-col justify-between rounded-2xl border border-white/10 bg-neutral-900 px-3.5 py-2.5 text-neutral-100 shadow-[0_8px_30px_rgba(0,0,0,0.55)]"
       >
         {/* Top line: status dot + task title (truncated) + close on hover. */}
         <div

@@ -1,6 +1,6 @@
 import { emit, emitTo, listen } from "@tauri-apps/api/event";
 import { WebviewWindow } from "@tauri-apps/api/webviewWindow";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWindow, primaryMonitor } from "@tauri-apps/api/window";
 import { usePlanner } from "../store";
 import type { Task } from "../types";
 import { todayKey } from "./date";
@@ -149,6 +149,24 @@ export async function openFocusWidget(): Promise<void> {
     }
     return;
   }
+  // Pin the badge to the TOP-RIGHT of the primary screen, just under the menu
+  // bar. Monitor size/position are physical px; divide by scaleFactor for the
+  // logical coords the window options expect. Fall back to a sane default if the
+  // monitor query fails.
+  const WIDGET_W = 300;
+  const INSET = 16;
+  let x = 16;
+  const y = 44;
+  try {
+    const mon = await primaryMonitor();
+    if (mon) {
+      const scale = mon.scaleFactor || 1;
+      const logicalRight = mon.position.x / scale + mon.size.width / scale;
+      x = Math.round(logicalRight - WIDGET_W - INSET);
+    }
+  } catch (err) {
+    console.error("primaryMonitor failed; defaulting widget position", err);
+  }
   const win = new WebviewWindow(FOCUS_WIDGET_LABEL, {
     url: "/",
     title: "Focus",
@@ -157,11 +175,10 @@ export async function openFocusWidget(): Promise<void> {
     // and rounded corners are not clipped by the window edge. We disable the
     // native window shadow (it would draw a hard rectangle behind the round
     // card) and draw our own soft shadow in CSS so it follows the corners.
-    width: 300,
+    width: WIDGET_W,
     height: 132,
-    // Top-left of the screen, just under the macOS menu bar with a small inset.
-    x: 16,
-    y: 44,
+    x,
+    y,
     transparent: true,
     shadow: false,
     resizable: false,
