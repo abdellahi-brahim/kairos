@@ -77,10 +77,13 @@ export function ZenMode() {
   const completeFocus = usePlanner((s) => s.completeFocus);
   const toggleFocusSubtask = usePlanner((s) => s.toggleFocusSubtask);
 
-  // A slow tick (~30s) drives the live "time left" and session-elapsed readouts.
+  // A 1s tick drives the live session-elapsed readout (seconds) and the "time
+  // left" line. Elapsed is always derived from wall-clock (Date.now() vs
+  // timer_started_at) per render, so this stays correct across sleep/wake; the
+  // tick only forces the re-render.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 30000);
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -153,9 +156,15 @@ export function ZenMode() {
   // Live session elapsed (only when running): now - timer_started_at.
   let sessionLabel: string | null = null;
   if (running && task.timer_started_at) {
-    const elapsedMs = Date.now() - new Date(task.timer_started_at).getTime();
-    const elapsedMin = Math.max(0, Math.floor(elapsedMs / 60000));
-    sessionLabel = `Focused ${formatDuration(elapsedMin)}`;
+    const elapsedSec = Math.max(
+      0,
+      Math.floor((Date.now() - new Date(task.timer_started_at).getTime()) / 1000),
+    );
+    const h = Math.floor(elapsedSec / 3600);
+    const m = Math.floor((elapsedSec % 3600) / 60);
+    const s = elapsedSec % 60;
+    const clock = h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
+    sessionLabel = `Focused ${clock}`;
   }
 
   const doneCount = subtasks.filter((s) => s.done).length;
