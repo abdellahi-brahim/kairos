@@ -152,8 +152,18 @@ export async function openFocusWidget(): Promise<void> {
   const win = new WebviewWindow(FOCUS_WIDGET_LABEL, {
     url: "/",
     title: "Focus",
-    width: 280,
-    height: 140,
+    // The window is intentionally a bit LARGER than the visible badge card. The
+    // card leaves a transparent margin inside the window so its CSS drop-shadow
+    // and rounded corners are not clipped by the window edge. We disable the
+    // native window shadow (it would draw a hard rectangle behind the round
+    // card) and draw our own soft shadow in CSS so it follows the corners.
+    width: 300,
+    height: 132,
+    // Top-left of the screen, just under the macOS menu bar with a small inset.
+    x: 16,
+    y: 44,
+    transparent: true,
+    shadow: false,
     resizable: false,
     decorations: false,
     alwaysOnTop: true,

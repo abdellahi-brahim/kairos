@@ -12,6 +12,12 @@ import "./index.css";
 const label = getCurrentWindow().label;
 const isFocusWidget = label === FOCUS_WIDGET_LABEL;
 
+// The widget window is natively transparent; flag the document so html/body/#root
+// drop their opaque background and only the rounded badge card stays visible.
+if (isFocusWidget) {
+  document.documentElement.classList.add("focus-widget-window");
+}
+
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     {isFocusWidget ? <FocusWidget /> : <App />}
