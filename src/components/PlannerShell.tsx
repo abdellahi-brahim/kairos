@@ -521,7 +521,7 @@ export function PlannerShell() {
           buttons are normal interactive children and stay clickable. */}
       <header
         data-tauri-drag-region
-        className="flex h-9 shrink-0 items-center gap-1.5 border-b border-neutral-200 bg-white pl-[78px] pr-3"
+        className="flex h-9 shrink-0 items-center justify-end gap-1.5 border-b border-neutral-200 bg-white px-3"
       >
         <button
           onClick={() => focusDayStartId != null && openFocus(focusDayStartId)}
