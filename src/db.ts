@@ -36,6 +36,22 @@ export async function fetchBacklog(): Promise<Task[]> {
   );
 }
 
+// All tasks whose planned_date falls within [startKey, endKey] (inclusive),
+// ordered so callers can group them by day in display order. Used by the Week
+// view; reuses the centralized column select so rows match the other buckets.
+export async function fetchTasksForRange(
+  startKey: string,
+  endKey: string,
+): Promise<Task[]> {
+  const db = await getDb();
+  return db.select<Task[]>(
+    `SELECT ${COLUMNS}${SUBTASK_COUNTS} FROM tasks
+       WHERE planned_date IS NOT NULL AND planned_date >= $1 AND planned_date <= $2
+       ORDER BY planned_date ASC, sort_order ASC, id ASC`,
+    [startKey, endKey],
+  );
+}
+
 // Unfinished tasks dated before `today` (carried over from previous days).
 export async function fetchCarryOver(today: string): Promise<Task[]> {
   const db = await getDb();

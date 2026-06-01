@@ -10,9 +10,14 @@ import { parseTags, tagColor } from "../lib/tags";
 export function TaskItem({
   task,
   bucket,
+  column,
 }: {
   task: Task;
   bucket: "day" | "backlog";
+  // Week view only: which column this row currently lives in (a "yyyy-MM-dd"
+  // day key, or "inbox"). Carried in the drag data so cross-column drops know
+  // the source. The Day view omits it and relies on `bucket`.
+  column?: string;
 }) {
   const toggleComplete = usePlanner((s) => s.toggleComplete);
   const removeTask = usePlanner((s) => s.removeTask);
@@ -22,7 +27,7 @@ export function TaskItem({
   const [hovered, setHovered] = useState(false);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: task.id, data: { type: "task", bucket, task } });
+    useSortable({ id: task.id, data: { type: "task", bucket, column, task } });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
