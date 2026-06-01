@@ -1,5 +1,10 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import {
+  isPermissionGranted,
+  requestPermission,
+  sendNotification,
+} from "@tauri-apps/plugin-notification";
 import type { Attachment, Comment, Subtask, Task } from "./types";
 import * as repo from "./db";
 import { dayRange, shiftDay, todayKey } from "./lib/date";
@@ -7,6 +12,44 @@ import { timeToMinutes } from "./lib/timeline";
 import * as prefs from "./lib/prefs";
 
 type Bucket = "day" | "backlog";
+
+// Pomodoro is a fixed rhythm, not a configurable timer app: a 25 minute work
+// block followed by a 5 minute break, auto-advancing work -> break -> work.
+export const POMODORO_WORK_MIN = 25;
+export const POMODORO_BREAK_MIN = 5;
+
+// Minimal, serializable pomodoro state. A future floating widget can subscribe
+// to this slice directly. `phaseEndsAt` is an absolute epoch-ms deadline for the
+// current phase (null while paused); `pausedRemainingMs` holds the frozen
+// remainder while paused (null while running).
+export interface PomodoroState {
+  active: boolean;
+  phase: "work" | "break";
+  phaseEndsAt: number | null;
+  pausedRemainingMs: number | null;
+}
+
+const POMODORO_INACTIVE: PomodoroState = {
+  active: false,
+  phase: "work",
+  phaseEndsAt: null,
+  pausedRemainingMs: null,
+};
+
+// One quiet notification per phase change. Best-effort: a denied permission or a
+// missing plugin must never break the rhythm, so failures are swallowed.
+async function notify(title: string, body: string): Promise<void> {
+  try {
+    let granted = await isPermissionGranted();
+    if (!granted) {
+      const result = await requestPermission();
+      granted = result === "granted";
+    }
+    if (granted) sendNotification({ title, body });
+  } catch (err) {
+    console.error("Notification failed", err);
+  }
+}
 
 // Side-panel UI preferences (single device, persisted in localStorage, not
 // SQLite). Defaults match the panels' previous hardcoded widths so existing
@@ -212,6 +255,19 @@ interface PlannerState {
   completeFocus: () => Promise<void>;
   toggleFocusSubtask: (sub: Subtask) => Promise<void>;
 
+  // Pomodoro mode (opt-in inside Zen). A WORK phase IS the focus timer running;
+  // a BREAK phase is the focus timer NOT running. Work time folds into
+  // actual_minutes via repo.stopRunningTimers at the work -> break boundary, so
+  // breaks never touch actual_minutes. The state object is replaced only when
+  // pomodoro actually changes, so a stable-slice selector (s.pomodoro) is safe.
+  pomodoro: PomodoroState;
+  startPomodoro: () => Promise<void>;
+  stopPomodoro: () => Promise<void>;
+  pausePomodoro: () => Promise<void>;
+  resumePomodoro: () => Promise<void>;
+  skipPhase: () => Promise<void>;
+  advancePomodoroIfDue: () => Promise<void>;
+
   refresh: () => Promise<void>;
   setDate: (date: string) => Promise<void>;
   // Patch a task in memory immediately, then run `persist` in the background.
@@ -248,6 +304,46 @@ interface PlannerState {
   setActual: (id: number, minutes: number) => Promise<void>;
   moveToToday: (id: number) => Promise<void>;
   moveAllToToday: (ids: number[]) => Promise<void>;
+}
+
+// Shared phase-transition logic for both auto-advance and skip. Leaving WORK
+// folds the work block into actual_minutes (repo.stopRunningTimers) and refreshes
+// so the card reflects it; entering WORK starts a fresh work block. Breaks never
+// touch the timer, so they never count toward actual_minutes. One quiet
+// notification per transition.
+async function advancePomodoro(
+  get: () => PlannerState,
+  set: (partial: Partial<PlannerState>) => void,
+): Promise<void> {
+  const { pomodoro, focusTaskId } = get();
+  if (!pomodoro.active) return;
+  if (pomodoro.phase === "work") {
+    // work -> break: fold the work minutes, then go idle for the break.
+    await repo.stopRunningTimers();
+    await get().refresh();
+    set({
+      pomodoro: {
+        active: true,
+        phase: "break",
+        phaseEndsAt: Date.now() + POMODORO_BREAK_MIN * 60_000,
+        pausedRemainingMs: null,
+      },
+    });
+    void notify("Break time", "Step away for 5 min");
+  } else {
+    // break -> work: start a fresh work block (timer running again).
+    if (focusTaskId != null) await repo.startTimer(focusTaskId);
+    await get().refresh();
+    set({
+      pomodoro: {
+        active: true,
+        phase: "work",
+        phaseEndsAt: Date.now() + POMODORO_WORK_MIN * 60_000,
+        pausedRemainingMs: null,
+      },
+    });
+    void notify("Back to focus", "25 min work block");
+  }
 }
 
 export const usePlanner = create<PlannerState>((set, get) => ({
@@ -308,6 +404,8 @@ export const usePlanner = create<PlannerState>((set, get) => ({
 
   focusTaskId: null,
   focusSubtasks: [],
+
+  pomodoro: POMODORO_INACTIVE,
 
   openDetail: async (id) => {
     set({
@@ -439,6 +537,10 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       }),
       focusTaskId: id,
       focusSubtasks: [],
+      // Switching the focused task stops any active pomodoro: the rhythm always
+      // belongs to one task, so the user re-starts it for the new task. The
+      // fresh startTimer above already owns the work timer for the new task.
+      pomodoro: POMODORO_INACTIVE,
     });
     const subtasks = await repo.fetchSubtasks(id);
     // Ignore if focus was closed/switched while loading.
@@ -451,7 +553,8 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   closeFocus: async () => {
     await repo.stopRunningTimers();
     await get().refresh();
-    set({ focusTaskId: null, focusSubtasks: [] });
+    // Leaving focus also clears pomodoro so it never runs without a focused task.
+    set({ focusTaskId: null, focusSubtasks: [], pomodoro: POMODORO_INACTIVE });
   },
 
   focusNext: async () => {
@@ -511,6 +614,96 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     const id = get().focusTaskId;
     if (id != null) set({ focusSubtasks: await repo.fetchSubtasks(id) });
     await get().refresh(); // update the card progress chip
+  },
+
+  // Enter the pomodoro rhythm on the focused task: begin a WORK block. Ensures
+  // the focus timer is running (so work time is tracked) and primes notification
+  // permission up front so the first phase change can notify silently.
+  startPomodoro: async () => {
+    const id = get().focusTaskId;
+    if (id == null) return;
+    // WORK = timer running; make sure it is.
+    const task = findTaskAnywhere(get(), id);
+    if (task && !task.timer_started_at) await repo.startTimer(id);
+    set({
+      pomodoro: {
+        active: true,
+        phase: "work",
+        phaseEndsAt: Date.now() + POMODORO_WORK_MIN * 60_000,
+        pausedRemainingMs: null,
+      },
+    });
+    // Best-effort permission request so the first transition notifies quietly.
+    void (async () => {
+      try {
+        if (!(await isPermissionGranted())) await requestPermission();
+      } catch (err) {
+        console.error("Notification permission request failed", err);
+      }
+    })();
+  },
+
+  // Exit pomodoro back to a plain focus session. If we were on a break the work
+  // timer is off, so restart it so normal session tracking continues.
+  stopPomodoro: async () => {
+    const { pomodoro, focusTaskId } = get();
+    if (pomodoro.phase === "break" && focusTaskId != null) {
+      await repo.startTimer(focusTaskId);
+      await get().refresh();
+    }
+    set({ pomodoro: POMODORO_INACTIVE });
+  },
+
+  // Freeze the countdown. During WORK, fold the partial work block into
+  // actual_minutes so paused time never counts as worked time.
+  pausePomodoro: async () => {
+    const { pomodoro } = get();
+    if (!pomodoro.active || pomodoro.pausedRemainingMs != null) return;
+    const remaining = Math.max(0, (pomodoro.phaseEndsAt ?? Date.now()) - Date.now());
+    if (pomodoro.phase === "work") {
+      await repo.stopRunningTimers();
+      await get().refresh();
+    }
+    set({
+      pomodoro: { ...pomodoro, phaseEndsAt: null, pausedRemainingMs: remaining },
+    });
+  },
+
+  // Resume the countdown from the frozen remainder. During WORK, restart the
+  // work timer so tracking continues.
+  resumePomodoro: async () => {
+    const { pomodoro, focusTaskId } = get();
+    if (!pomodoro.active || pomodoro.pausedRemainingMs == null) return;
+    if (pomodoro.phase === "work" && focusTaskId != null) {
+      await repo.startTimer(focusTaskId);
+    }
+    set({
+      pomodoro: {
+        ...pomodoro,
+        phaseEndsAt: Date.now() + pomodoro.pausedRemainingMs,
+        pausedRemainingMs: null,
+      },
+    });
+  },
+
+  // Immediately advance to the other phase (same transitions as auto-advance).
+  skipPhase: async () => {
+    await advancePomodoro(get, set);
+  },
+
+  // Auto-advance when the current phase's deadline has passed. Driven by the 1s
+  // Zen tick so transitions fire even with the window focused. Cheap when idle.
+  advancePomodoroIfDue: async () => {
+    const { pomodoro } = get();
+    if (
+      !pomodoro.active ||
+      pomodoro.pausedRemainingMs != null ||
+      pomodoro.phaseEndsAt == null ||
+      Date.now() < pomodoro.phaseEndsAt
+    ) {
+      return;
+    }
+    await advancePomodoro(get, set);
   },
 
   refresh: async () => {

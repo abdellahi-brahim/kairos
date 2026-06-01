@@ -77,15 +77,31 @@ export function ZenMode() {
   const completeFocus = usePlanner((s) => s.completeFocus);
   const toggleFocusSubtask = usePlanner((s) => s.toggleFocusSubtask);
 
+  // Pomodoro: read the state as one stable slice (the store only replaces this
+  // object when pomodoro actually changes), and pull the actions individually.
+  const pomodoro = usePlanner((s) => s.pomodoro);
+  const startPomodoro = usePlanner((s) => s.startPomodoro);
+  const stopPomodoro = usePlanner((s) => s.stopPomodoro);
+  const pausePomodoro = usePlanner((s) => s.pausePomodoro);
+  const resumePomodoro = usePlanner((s) => s.resumePomodoro);
+  const skipPhase = usePlanner((s) => s.skipPhase);
+  const advancePomodoroIfDue = usePlanner((s) => s.advancePomodoroIfDue);
+
   // A 1s tick drives the live session-elapsed readout (seconds) and the "time
   // left" line. Elapsed is always derived from wall-clock (Date.now() vs
   // timer_started_at) per render, so this stays correct across sleep/wake; the
   // tick only forces the re-render.
   const [, setTick] = useState(0);
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    const interval = setInterval(() => {
+      setTick((t) => t + 1);
+      // Drive pomodoro phase transitions from the same tick so they fire even
+      // with the window focused. advancePomodoroIfDue is a cheap no-op unless a
+      // phase deadline has actually passed.
+      void advancePomodoroIfDue();
+    }, 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [advancePomodoroIfDue]);
 
   // Keyboard: Esc closes, Left/Right move prev/next. Ignored while focus in an
   // editable node (there should be none here, but be safe).
@@ -167,6 +183,21 @@ export function ZenMode() {
     sessionLabel = `Focused ${clock}`;
   }
 
+  // Pomodoro phase countdown. Primary timer display when pomodoro is active:
+  // computed each tick from phaseEndsAt (running) or pausedRemainingMs (paused).
+  const pomoActive = pomodoro.active;
+  const pomoPaused = pomodoro.pausedRemainingMs != null;
+  let pomoCountdown = "";
+  if (pomoActive) {
+    const remainMs = pomoPaused
+      ? pomodoro.pausedRemainingMs ?? 0
+      : Math.max(0, (pomodoro.phaseEndsAt ?? Date.now()) - Date.now());
+    const totalSec = Math.ceil(remainMs / 1000);
+    pomoCountdown = `${pad(Math.floor(totalSec / 60))}:${pad(totalSec % 60)}`;
+  }
+  const pomoIsWork = pomodoro.phase === "work";
+  const pomoLabel = pomoIsWork ? "Focus" : "Break";
+
   const doneCount = subtasks.filter((s) => s.done).length;
 
   return (
@@ -199,11 +230,68 @@ export function ZenMode() {
           {task.title}
         </h1>
 
-        {/* Session indicator. */}
-        {sessionLabel && (
-          <div className="mt-3 flex items-center gap-2 text-[13px] text-emerald-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" />
-            {sessionLabel}
+        {/* Timer area. When pomodoro is active the phase countdown is the primary
+            timer (the plain count-up is hidden); otherwise the count-up shows and
+            a calm Pomodoro button is offered. */}
+        {pomoActive ? (
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <div
+              className={
+                "flex items-center gap-2 text-[15px] font-medium tabular-nums " +
+                (pomoIsWork ? "text-indigo-300" : "text-emerald-300")
+              }
+            >
+              <span
+                className={
+                  "h-2 w-2 rounded-full " +
+                  (pomoIsWork ? "bg-indigo-400" : "bg-emerald-400") +
+                  (pomoPaused ? " opacity-40" : "")
+                }
+              />
+              {pomoLabel} {pomoCountdown}
+              {pomoPaused && (
+                <span className="text-[12px] font-normal text-neutral-500">
+                  paused
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() =>
+                  pomoPaused ? void resumePomodoro() : void pausePomodoro()
+                }
+                className="rounded-md px-2.5 py-1 text-[13px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              >
+                {pomoPaused ? "Resume" : "Pause"}
+              </button>
+              <button
+                onClick={() => void skipPhase()}
+                className="rounded-md px-2.5 py-1 text-[13px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+              >
+                Skip
+              </button>
+              <button
+                onClick={() => void stopPomodoro()}
+                className="rounded-md px-2.5 py-1 text-[13px] text-neutral-500 hover:bg-neutral-800 hover:text-neutral-300"
+              >
+                End pomodoro
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {sessionLabel && (
+              <div className="flex items-center gap-2 text-[13px] text-emerald-400">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                {sessionLabel}
+              </div>
+            )}
+            <button
+              onClick={() => void startPomodoro()}
+              className="rounded-md px-2.5 py-1 text-[13px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+            >
+              Pomodoro
+            </button>
           </div>
         )}
 
