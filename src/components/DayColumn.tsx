@@ -90,8 +90,13 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
     <div
       data-day={date}
       className={
-        "flex w-60 shrink-0 flex-col border-r border-neutral-200 " +
-        (isSelected ? "bg-indigo-50/30" : "")
+        // A 2px top border on every column keeps content alignment identical
+        // across columns; only the selected one colors it indigo so it visually
+        // connects up to the timeline panel on the right.
+        "flex w-60 shrink-0 flex-col border-r border-t-2 border-neutral-200 " +
+        (isSelected
+          ? "border-t-indigo-500 bg-indigo-50/30"
+          : "border-t-transparent")
       }
     >
       <button

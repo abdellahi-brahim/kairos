@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -20,7 +20,8 @@ import {
 } from "@dnd-kit/sortable";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
-import { prettyDate, relativeLabel, todayKey } from "../lib/date";
+import { formatDuration, prettyDate, relativeLabel, shiftDay, todayKey } from "../lib/date";
+import { priorityMeta } from "../lib/priority";
 import {
   DEFAULT_BLOCK_MIN,
   PX_PER_MIN,
@@ -38,15 +39,12 @@ import { BlockCard, blockSurfaceClass } from "./BlockCard";
 import { InsertionContext, type Insertion } from "./InsertionContext";
 import * as dragCursor from "../lib/dragCursor";
 
-// While moving a timeline block, lock it to the vertical axis and snap to the
-// 15-min grid so the single card jumps in slot increments (the card is the
-// preview - no separate drop ghost).
+// While moving a timeline block, lock it to the vertical axis. By default we
+// snap to the 15-min grid so the single card jumps in slot increments (the card
+// is the preview - no separate drop ghost). Holding Alt/Option bypasses the snap
+// for fine 1px = 1min placement; the modifier reads live Alt state from a ref so
+// the preview tracks the key without restarting the drag.
 const SNAP_PX = SNAP_MIN * PX_PER_MIN;
-const snapBlockToGrid: Modifier = ({ transform }) => ({
-  ...transform,
-  x: 0,
-  y: Math.round(transform.y / SNAP_PX) * SNAP_PX,
-});
 
 // Drag data attached to a column/inbox task row (TaskItem) or a timeline block
 // (TimeBlock). `bucket` distinguishes a planned day row from an inbox row;
@@ -183,6 +181,7 @@ export function PlannerShell() {
   const reorder = usePlanner((s) => s.reorder);
   const scheduleTask = usePlanner((s) => s.scheduleTask);
   const scheduleOnSelected = usePlanner((s) => s.scheduleOnSelected);
+  const detailTaskId = usePlanner((s) => s.detailTaskId);
 
   // Drag overlay state: a list pill (column/inbox row) or a lifted block.
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -204,6 +203,9 @@ export function PlannerShell() {
   const stripRef = useRef<HTMLDivElement | null>(null);
   // Scroll today's column to the left edge of the strip once after it loads.
   const scrolledToToday = useRef(false);
+  // Live Alt/Option state during a drag. Updated by global keydown/keyup so both
+  // the drag modifier and onDragEnd can read it without re-rendering.
+  const altRef = useRef(false);
 
   const scrollToToday = () => {
     const el = stripRef.current?.querySelector<HTMLElement>(
@@ -211,6 +213,32 @@ export function PlannerShell() {
     );
     el?.scrollIntoView({ inline: "start", block: "nearest" });
   };
+
+  // Bring a given day column into view (best-effort: a key outside the loaded
+  // strip simply finds nothing, which is harmless).
+  const scrollDayIntoView = (key: string) => {
+    const el = stripRef.current?.querySelector<HTMLElement>(
+      `[data-day="${key}"]`,
+    );
+    el?.scrollIntoView({ inline: "nearest", block: "nearest" });
+  };
+
+  // The block-drag modifier, rebuilt only when SNAP_PX changes (effectively
+  // once). It closes over altRef so it reads live Alt state: Alt held skips the
+  // y-snap for 1-min placement; otherwise it snaps y to the grid. Either way x
+  // stays locked to the vertical axis.
+  const snapBlockToGrid = useMemo<Modifier>(
+    () =>
+      ({ transform }) =>
+        altRef.current
+          ? { ...transform, x: 0 }
+          : {
+              ...transform,
+              x: 0,
+              y: Math.round(transform.y / SNAP_PX) * SNAP_PX,
+            },
+    [],
+  );
 
   // Small threshold so taps on a row's controls still register as clicks.
   const sensors = useSensors(
@@ -232,6 +260,62 @@ export function PlannerShell() {
     scrollToToday();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [weekDays.length]);
+
+  // Track live Alt/Option state for the block-drag fine-placement bypass.
+  useEffect(() => {
+    const sync = (e: KeyboardEvent) => {
+      altRef.current = e.altKey;
+    };
+    window.addEventListener("keydown", sync);
+    window.addEventListener("keyup", sync);
+    return () => {
+      window.removeEventListener("keydown", sync);
+      window.removeEventListener("keyup", sync);
+    };
+  }, []);
+
+  // Global keyboard day navigation: Left/Right step the selected day, t/T jumps
+  // to today. Guarded so it never hijacks typing in a field or while the detail
+  // modal is open.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // Do nothing while the detail modal is open.
+      if (detailTaskId != null) return;
+      // Do nothing when typing in an input, textarea, select, or editable node.
+      const t = e.target as HTMLElement | null;
+      const tag = t?.tagName;
+      if (
+        tag === "INPUT" ||
+        tag === "TEXTAREA" ||
+        tag === "SELECT" ||
+        t?.isContentEditable
+      ) {
+        return;
+      }
+      // Ignore modified chords so shortcuts like Cmd+R are left alone.
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        const next = shiftDay(selectedDate, -1);
+        setDate(next);
+        scrollDayIntoView(next);
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        const next = shiftDay(selectedDate, 1);
+        setDate(next);
+        scrollDayIntoView(next);
+      } else if (e.key === "t" || e.key === "T") {
+        e.preventDefault();
+        setDate(todayKey());
+        scrollToToday();
+      }
+      // Other keys: do not preventDefault, let them through.
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, detailTaskId, setDate]);
 
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;
@@ -324,8 +408,11 @@ export function PlannerShell() {
     if (aData.type === "block") {
       const startMin = timeToMinutes(aData.task.scheduled_start!);
       const duration = aData.task.estimate_minutes ?? DEFAULT_BLOCK_MIN;
+      // Match the preview: Alt held drops at 1-min resolution (no grid snap),
+      // otherwise snap to the 15-min grid. Both clamp into the visible day.
+      const movedMin = startMin + delta.y / PX_PER_MIN;
       const newStart = clampStart(
-        snap(startMin + delta.y / PX_PER_MIN),
+        altRef.current ? Math.round(movedMin) : snap(movedMin),
         duration,
       );
       scheduleTask(aData.task.id, minutesToTime(newStart));
@@ -442,8 +529,27 @@ export function PlannerShell() {
           modifiers={activeBlock ? [snapBlockToGrid] : undefined}
         >
           {activeTask ? (
-            <div className="max-w-[14rem] truncate rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-[12px] text-neutral-800 shadow-lg">
-              {activeTask.title}
+            // A faithful, slightly-lifted copy of the card: title + estimate
+            // chip (so the user sees the duration that sizes the drop-ghost),
+            // plus the priority left-rail accent for fidelity.
+            <div
+              className={
+                "w-56 rounded-md border border-neutral-300 bg-white px-2 py-1.5 shadow-lg rotate-[1deg] " +
+                (activeTask.priority > 0
+                  ? "border-l-2 " + priorityMeta(activeTask.priority).rail
+                  : "")
+              }
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-neutral-800">
+                  {activeTask.title}
+                </span>
+                {activeTask.estimate_minutes != null && (
+                  <span className="shrink-0 rounded bg-indigo-50 px-1 py-0.5 text-[11px] font-medium tabular-nums text-indigo-600">
+                    {formatDuration(activeTask.estimate_minutes)}
+                  </span>
+                )}
+              </div>
             </div>
           ) : activeBlock ? (
             <div

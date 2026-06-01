@@ -119,8 +119,10 @@ export function TaskItem({
           {...listeners}
           aria-label="Drag to reorder"
           className={
+            // Faint at rest so it reads as a quiet hint without competing with
+            // the title; fully visible on hover.
             "flex h-5 shrink-0 cursor-grab items-center text-[11px] leading-none text-neutral-300 transition-opacity " +
-            (hovered ? "opacity-100" : "opacity-0")
+            (hovered ? "opacity-100" : "opacity-30")
           }
         >
           ⠿
