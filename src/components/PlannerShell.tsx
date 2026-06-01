@@ -27,6 +27,7 @@ import {
   PX_PER_MIN,
   SNAP_MIN,
   clampStart,
+  computeWindow,
   minutesToTime,
   snap,
   timeToMinutes,
@@ -37,6 +38,7 @@ import { AddTask } from "./AddTask";
 import { Timeline, type DropPreview } from "./Timeline";
 import { BlockCard, blockSurfaceClass } from "./BlockCard";
 import { InsertionContext, type Insertion } from "./InsertionContext";
+import { TimelineWindowContext } from "./TimelineWindowContext";
 import * as dragCursor from "../lib/dragCursor";
 
 // While moving a timeline block, lock it to the vertical axis. By default we
@@ -171,6 +173,7 @@ function TimelinePanel({ preview }: { preview: DropPreview | null }) {
 export function PlannerShell() {
   const weekDays = usePlanner((s) => s.weekDays);
   const weekTasks = usePlanner((s) => s.weekTasks);
+  const dayTasks = usePlanner((s) => s.dayTasks);
   const weekLoading = usePlanner((s) => s.weekLoading);
   const backlog = usePlanner((s) => s.backlog);
   const selectedDate = usePlanner((s) => s.selectedDate);
@@ -222,6 +225,11 @@ export function PlannerShell() {
     );
     el?.scrollIntoView({ inline: "nearest", block: "nearest" });
   };
+
+  // The single visible window for the selected day's timeline, grown to enclose
+  // any block scheduled outside the default 06:00-22:00. Shared by every
+  // timeline consumer via context and by the block drop math below.
+  const timelineWindow = useMemo(() => computeWindow(dayTasks), [dayTasks]);
 
   // The block-drag modifier, rebuilt only when SNAP_PX changes (effectively
   // once). It closes over altRef so it reads live Alt state: Alt held skips the
@@ -414,6 +422,7 @@ export function PlannerShell() {
       const newStart = clampStart(
         altRef.current ? Math.round(movedMin) : snap(movedMin),
         duration,
+        timelineWindow,
       );
       scheduleTask(aData.task.id, minutesToTime(newStart));
       return;
@@ -494,6 +503,7 @@ export function PlannerShell() {
         onDragCancel={endDrag}
       >
         <InsertionContext.Provider value={insertion}>
+        <TimelineWindowContext.Provider value={timelineWindow}>
         <div className="flex flex-1 overflow-hidden">
           {/* LEFT: pinned Inbox (outside the horizontal scroll). */}
           <InboxColumn tasks={backlog} />
@@ -522,6 +532,7 @@ export function PlannerShell() {
           {/* RIGHT: collapsible Timeline panel for the selected day. */}
           <TimelinePanel preview={preview} />
         </div>
+        </TimelineWindowContext.Provider>
         </InsertionContext.Provider>
 
         <DragOverlay

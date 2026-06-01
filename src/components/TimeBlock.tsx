@@ -5,7 +5,6 @@ import { usePlanner } from "../store";
 import * as dragCursor from "../lib/dragCursor";
 import { BlockCard, blockSurfaceClass } from "./BlockCard";
 import {
-  DAY_END_MIN,
   DEFAULT_BLOCK_MIN,
   PX_PER_MIN,
   SNAP_MIN,
@@ -13,10 +12,12 @@ import {
   timeToMinutes,
   topForMinutes,
 } from "../lib/timeline";
+import { useTimelineWindow } from "./TimelineWindowContext";
 
 export function TimeBlock({ task }: { task: Task }) {
   const editTask = usePlanner((s) => s.editTask);
   const unschedule = usePlanner((s) => s.unscheduleTask);
+  const win = useTimelineWindow();
 
   const startMin = timeToMinutes(task.scheduled_start!);
   const duration = task.estimate_minutes ?? DEFAULT_BLOCK_MIN;
@@ -46,7 +47,7 @@ export function TimeBlock({ task }: { task: Task }) {
       const delta = (ev.clientY - startY) / PX_PER_MIN;
       const next = Math.max(
         SNAP_MIN,
-        Math.min(snap(duration + delta), DAY_END_MIN - startMin),
+        Math.min(snap(duration + delta), win.endMin - startMin),
       );
       setResizeMin(next);
     };
@@ -89,7 +90,7 @@ export function TimeBlock({ task }: { task: Task }) {
 
   const done = task.status === "done";
   const style: CSSProperties = {
-    top: topForMinutes(startMin),
+    top: topForMinutes(startMin, win),
     height: shownDuration * PX_PER_MIN,
     zIndex: isDragging ? 30 : 10,
   };

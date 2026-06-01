@@ -4,21 +4,23 @@ import { todayKey } from "../lib/date";
 import { TimeBlock } from "./TimeBlock";
 import { NowLine } from "./NowLine";
 import {
-  HOURS,
   PX_PER_MIN,
   SNAP_MIN,
-  TIMELINE_HEIGHT,
-  slotTimes,
+  hoursFor,
+  slotTimesFor,
   timeToMinutes,
+  timelineHeight,
   topForMinutes,
+  type TimelineWindow,
 } from "../lib/timeline";
+import { useTimelineWindow } from "./TimelineWindowContext";
 
 export interface DropPreview {
   time: string;
   durationMin: number;
 }
 
-function Slot({ time }: { time: string }) {
+function Slot({ time, win }: { time: string; win: TimelineWindow }) {
   const { setNodeRef } = useDroppable({
     id: `slot-${time}`,
     data: { type: "slot", time },
@@ -27,7 +29,7 @@ function Slot({ time }: { time: string }) {
     <div
       ref={setNodeRef}
       style={{
-        top: topForMinutes(timeToMinutes(time)),
+        top: topForMinutes(timeToMinutes(time), win),
         height: SNAP_MIN * PX_PER_MIN,
       }}
       className="absolute left-14 right-2"
@@ -38,16 +40,17 @@ function Slot({ time }: { time: string }) {
 export function Timeline({ preview }: { preview: DropPreview | null }) {
   const dayTasks = usePlanner((s) => s.dayTasks);
   const selectedDate = usePlanner((s) => s.selectedDate);
+  const win = useTimelineWindow();
   const scheduled = dayTasks.filter((t) => t.scheduled_start);
 
   return (
-    <div className="relative" style={{ height: TIMELINE_HEIGHT }}>
+    <div className="relative" style={{ height: timelineHeight(win) }}>
       {/* Hour gridlines + labels */}
-      {HOURS.map((h) => (
+      {hoursFor(win).map((h) => (
         <div
           key={h}
           className="absolute inset-x-0 border-t border-neutral-100"
-          style={{ top: topForMinutes(h * 60) }}
+          style={{ top: topForMinutes(h * 60, win) }}
         >
           <span className="absolute -top-2 left-0 w-12 pr-2 text-right text-[10px] tabular-nums text-neutral-400">
             {String(h).padStart(2, "0")}:00
@@ -56,8 +59,8 @@ export function Timeline({ preview }: { preview: DropPreview | null }) {
       ))}
 
       {/* 15-minute drop targets (invisible; preview is drawn separately) */}
-      {slotTimes().map((t) => (
-        <Slot key={t} time={t} />
+      {slotTimesFor(win).map((t) => (
+        <Slot key={t} time={t} win={win} />
       ))}
 
       {/* Ghost preview of where the dragged task will land, at full height */}
@@ -65,7 +68,7 @@ export function Timeline({ preview }: { preview: DropPreview | null }) {
         <div
           className="pointer-events-none absolute left-14 right-2 z-0 rounded-md border-2 border-dashed border-indigo-300 bg-indigo-100/50"
           style={{
-            top: topForMinutes(timeToMinutes(preview.time)),
+            top: topForMinutes(timeToMinutes(preview.time), win),
             height: preview.durationMin * PX_PER_MIN,
           }}
         />
