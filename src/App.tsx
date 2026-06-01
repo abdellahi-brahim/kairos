@@ -1,12 +1,10 @@
 import { useEffect } from "react";
 import { usePlanner } from "./store";
-import { DayView } from "./components/DayView";
-import { WeekView } from "./components/WeekView";
+import { PlannerShell } from "./components/PlannerShell";
 import { TaskDetailModal } from "./components/TaskDetailModal";
 
 function App() {
   const refresh = usePlanner((s) => s.refresh);
-  const view = usePlanner((s) => s.view);
   const detailTaskId = usePlanner((s) => s.detailTaskId);
 
   useEffect(() => {
@@ -15,7 +13,7 @@ function App() {
 
   return (
     <>
-      {view === "week" ? <WeekView /> : <DayView />}
+      <PlannerShell />
       {detailTaskId != null && (
         <TaskDetailModal key={detailTaskId} taskId={detailTaskId} />
       )}

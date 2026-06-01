@@ -74,7 +74,7 @@ export function TimeBlock({ task }: { task: Task }) {
     window.addEventListener("pointercancel", cancel);
   };
 
-  // Move is rendered by the DragOverlay in PlannerBoard; the source node stays
+  // Move is rendered by the DragOverlay in PlannerShell; the source node stays
   // put (no transform) so dnd-kit's layout-shift compensation never fights the
   // top/height we own here (which caused an accumulating offset after resizes).
   const onMovePointerDown = (e: PointerEvent) => {

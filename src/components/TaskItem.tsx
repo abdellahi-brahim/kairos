@@ -7,6 +7,13 @@ import { formatDuration } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
 import { parseTags, tagColor } from "../lib/tags";
 
+// A dense, title-first task row shared by every column (Inbox + day columns).
+//
+// Layout: a title line where the title always wins for space (it truncates LAST,
+// never to "F..."), preceded only by the small fixed-width controls (drag
+// handle, checkbox, priority dot). All secondary metadata (scheduled time,
+// estimate, tags, tracked time, subtasks) lives on a compact, de-emphasized
+// second footer line that wraps/shrinks instead of stealing the title's width.
 export function TaskItem({
   task,
   bucket,
@@ -39,6 +46,16 @@ export function TaskItem({
   const tags = parseTags(task.tags);
   const open = () => openDetail(task.id);
 
+  // Whether any footer metadata exists. Keeps the row to a single line when a
+  // task is bare (the common Inbox case), preserving vertical density.
+  const hasMeta =
+    !!task.scheduled_start ||
+    task.estimate_minutes != null ||
+    tags.length > 0 ||
+    running ||
+    task.actual_minutes > 0 ||
+    (!!task.subtask_total && task.subtask_total > 0);
+
   return (
     <li
       ref={setNodeRef}
@@ -46,17 +63,18 @@ export function TaskItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        "rounded-lg border bg-white px-1.5 py-1.5 " +
-        (hovered ? "border-neutral-200 shadow-sm" : "border-transparent")
+        "rounded border px-1 py-0.5 " +
+        (hovered ? "border-neutral-200 bg-white" : "border-transparent")
       }
     >
-      <div className="flex items-center gap-2">
+      {/* Title line: controls are fixed-width, the title flex-grows + truncates. */}
+      <div className="flex items-center gap-1.5">
         <button
           {...attributes}
           {...listeners}
           aria-label="Drag to reorder"
           className={
-            "cursor-grab text-neutral-300 transition-opacity " +
+            "shrink-0 cursor-grab text-[11px] leading-none text-neutral-300 transition-opacity " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
@@ -67,106 +85,96 @@ export function TaskItem({
           type="checkbox"
           checked={done}
           onChange={() => toggleComplete(task)}
-          className="h-4 w-4 shrink-0 cursor-pointer accent-indigo-500"
+          className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-indigo-500"
         />
 
         {task.priority > 0 && (
           <span
             title={`${priorityMeta(task.priority).label} priority`}
             className={
-              "h-2 w-2 shrink-0 rounded-full " + priorityMeta(task.priority).dot
+              "h-1.5 w-1.5 shrink-0 rounded-full " +
+              priorityMeta(task.priority).dot
             }
           />
         )}
 
         <button
           onClick={open}
-          title="Open details"
+          title={task.title}
           className={
-            "flex-1 truncate text-left text-sm " +
+            "min-w-0 flex-1 truncate text-left text-[13px] leading-5 " +
             (done ? "text-neutral-400 line-through" : "text-neutral-800")
           }
         >
           {task.title}
         </button>
 
-        <div className="ml-auto flex items-center gap-1">
-          {tags.slice(0, 2).map((t) => (
-            <button
-              key={t}
-              onClick={open}
-              className={
-                "rounded px-1.5 py-0.5 text-[10px] font-medium " + tagColor(t)
-              }
-            >
-              {t}
-            </button>
-          ))}
-          {tags.length > 2 && (
-            <span className="text-[10px] text-neutral-400">
-              +{tags.length - 2}
+        <button
+          aria-label="Delete task"
+          onClick={() => removeTask(task.id)}
+          className={
+            "shrink-0 rounded px-1 text-[11px] leading-none text-neutral-400 hover:bg-red-50 hover:text-red-500 " +
+            (hovered ? "opacity-100" : "opacity-0")
+          }
+        >
+          ✕
+        </button>
+      </div>
+
+      {/* Footer: compact, muted metadata. Indented to align under the title,
+          shrinks/wraps rather than crowding the title above it. */}
+      {hasMeta && (
+        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[10px] leading-none text-neutral-400">
+          {task.scheduled_start && (
+            <span className="tabular-nums text-neutral-500">
+              {task.scheduled_start}
             </span>
           )}
-          {running && (
-            <span
-              title="Timer running"
-              className="h-2 w-2 shrink-0 rounded-full bg-emerald-500"
-            />
+          {task.estimate_minutes != null && (
+            <button
+              onClick={open}
+              title="Estimate"
+              className="rounded bg-indigo-50 px-1 py-0.5 font-medium tabular-nums text-indigo-600"
+            >
+              {formatDuration(task.estimate_minutes)}
+            </button>
           )}
           {task.actual_minutes > 0 && (
             <button
               onClick={open}
               title="Tracked time"
-              className="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-emerald-600"
+              className="rounded bg-emerald-50 px-1 py-0.5 font-medium tabular-nums text-emerald-600"
             >
               {formatDuration(task.actual_minutes)}
             </button>
+          )}
+          {running && (
+            <span
+              title="Timer running"
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+            />
           )}
           {!!task.subtask_total && task.subtask_total > 0 && (
             <button
               onClick={open}
               title="Subtasks"
-              className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-neutral-500"
+              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
             >
               ☑ {task.subtask_done ?? 0}/{task.subtask_total}
             </button>
           )}
-
-          {/* Fixed-width time + estimate columns keep rows aligned. */}
-          <div className="flex w-14 justify-end">
-            {task.scheduled_start && (
-              <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-neutral-500">
-                {task.scheduled_start}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={open}
-            title="Estimate"
-            className={
-              task.estimate_minutes != null
-                ? "block w-11 rounded-md bg-indigo-50 px-1.5 py-0.5 text-center text-xs font-medium text-indigo-600"
-                : "block w-11 rounded-md px-1.5 py-0.5 text-center text-xs text-neutral-400 " +
-                  (hovered ? "opacity-100" : "opacity-0")
-            }
-          >
-            {task.estimate_minutes != null
-              ? formatDuration(task.estimate_minutes)
-              : "+ est"}
-          </button>
-
-          <button
-            aria-label="Delete task"
-            onClick={() => removeTask(task.id)}
-            className={
-              "w-5 rounded text-center text-xs text-neutral-400 hover:bg-red-50 hover:text-red-500 " +
-              (hovered ? "opacity-100" : "opacity-0")
-            }
-          >
-            ✕
-          </button>
+          {tags.slice(0, 2).map((t) => (
+            <button
+              key={t}
+              onClick={open}
+              className={"rounded px-1 py-0.5 font-medium " + tagColor(t)}
+            >
+              {t}
+            </button>
+          ))}
+          {tags.length > 2 && <span>+{tags.length - 2}</span>}
         </div>
-      </div>
+      )}
     </li>
   );
 }

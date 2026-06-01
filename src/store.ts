@@ -5,9 +5,12 @@ import { dayRange, shiftDay, todayKey } from "./lib/date";
 
 type Bucket = "day" | "backlog";
 
-// How many days the Week view loads initially (today + the next N-1 days) and
-// how many it appends each time the user scrolls near the right edge.
-const WEEK_INITIAL_DAYS = 15; // today through ~14 days ahead
+// The week strip loads a window of days. To make overdue/carry-over tasks
+// reachable by simply scrolling left (we deliberately do not build a dedicated
+// carry-over UI), the window starts a few days BEFORE today; today stays the
+// default selected day and the strip extends into the future on scroll-right.
+const WEEK_PAST_DAYS = 7; // days before today included in the initial window
+const WEEK_INITIAL_DAYS = 7 + 15; // 7 past + today + ~14 ahead
 const WEEK_EXTEND_DAYS = 7;
 
 // Apply `fields` to the matching task wherever it appears in the week map,
@@ -74,11 +77,11 @@ function patchTaskInBuckets(
   return next;
 }
 
-type ViewMode = "day" | "week";
-
 interface PlannerState {
-  view: ViewMode;
-  setView: (view: ViewMode) => void;
+  // Right-hand Timeline panel collapse state. The week strip takes the full
+  // width when collapsed; default is expanded.
+  timelineCollapsed: boolean;
+  toggleTimeline: () => void;
 
   selectedDate: string;
   dayTasks: Task[];
@@ -141,6 +144,12 @@ interface PlannerState {
   reorder: (bucket: Bucket, orderedIds: number[]) => Promise<void>;
   moveTask: (id: number, toDate: string | null) => Promise<void>;
   scheduleTask: (id: number, startTime: string) => Promise<void>;
+  // Drag-to-schedule from any week column or the Inbox onto the timeline of the
+  // selected day. Finds the task wherever it lives (day buckets, backlog, or the
+  // week map), then schedules it on `selectedDate` at `startTime`, relocating it
+  // in the week map so the source column no longer shows it and the selected
+  // day's column / dayTasks do. Optimistic + flash-free, persists in background.
+  scheduleOnSelected: (id: number, startTime: string) => Promise<void>;
   unscheduleTask: (id: number) => Promise<void>;
   toggleTimer: (task: Task) => Promise<void>;
   setActual: (id: number, minutes: number) => Promise<void>;
@@ -149,8 +158,9 @@ interface PlannerState {
 }
 
 export const usePlanner = create<PlannerState>((set, get) => ({
-  view: "day",
-  setView: (view) => set({ view }),
+  timelineCollapsed: false,
+  toggleTimeline: () =>
+    set((s) => ({ timelineCollapsed: !s.timelineCollapsed })),
 
   selectedDate: todayKey(),
   dayTasks: [],
@@ -225,12 +235,20 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   },
 
   setDate: async (date) => {
-    set({ selectedDate: date, loading: true });
+    // Seed dayTasks from the already-loaded week map so the timeline switches to
+    // the new day's blocks on the very next render (no flash of the old day),
+    // then reconcile from disk in the background.
+    const seeded = get().weekTasks[date];
+    set({
+      selectedDate: date,
+      loading: seeded == null,
+      ...(seeded != null ? { dayTasks: seeded } : {}),
+    });
     await get().refresh();
   },
 
   loadWeek: async () => {
-    const days = dayRange(todayKey(), WEEK_INITIAL_DAYS);
+    const days = dayRange(shiftDay(todayKey(), -WEEK_PAST_DAYS), WEEK_INITIAL_DAYS);
     set({ weekDays: days, weekLoading: true });
     const [rows, backlog] = await Promise.all([
       repo.fetchTasksForRange(days[0], days[days.length - 1]),
@@ -258,6 +276,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   moveTaskWeek: async (id, toDate) => {
     const before = get().weekTasks;
     const beforeBacklog = get().backlog;
+    const beforeDayTasks = get().dayTasks;
 
     // Find the task and its source list (a loaded day or the backlog/inbox).
     let task: Task | undefined;
@@ -292,18 +311,30 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       nextBacklog = [...nextBacklog, moved];
     }
 
-    set({ weekTasks: nextWeek, backlog: nextBacklog });
+    // Keep the selected day's `dayTasks` (which the Timeline reads) in sync
+    // synchronously so moving a row onto/off the selected day's column updates
+    // the timeline with no flash and no disk reload.
+    const sel = get().selectedDate;
+    let nextDayTasks = beforeDayTasks;
+    if (task.planned_date === sel && toDate !== sel) {
+      nextDayTasks = beforeDayTasks.filter((t) => t.id !== id);
+    } else if (toDate === sel && task.planned_date !== sel) {
+      nextDayTasks = [...beforeDayTasks.filter((t) => t.id !== id), moved];
+    }
+
+    set({ weekTasks: nextWeek, backlog: nextBacklog, dayTasks: nextDayTasks });
     try {
       await repo.updateTask(
         id,
         fields as Record<string, string | number | null>,
       );
-      // Keep the Day view consistent if its selected day is involved.
-      const sel = get().selectedDate;
-      if (sel === toDate || sel === task.planned_date) await get().refresh();
     } catch (err) {
       console.error("Week move failed; rolling back", err);
-      set({ weekTasks: before, backlog: beforeBacklog });
+      set({
+        weekTasks: before,
+        backlog: beforeBacklog,
+        dayTasks: beforeDayTasks,
+      });
     }
   },
 
@@ -424,16 +455,24 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       backlog: get().backlog,
       carryOver: get().carryOver,
     };
+    const beforeWeek = get().weekTasks;
+    // Apply the new order to every week column too, so reordering any day column
+    // (not just the selected day's dayTasks) takes effect on the next render.
+    const nextWeek: Record<string, Task[]> = {};
+    for (const key of Object.keys(beforeWeek)) {
+      nextWeek[key] = sortByOrder(beforeWeek[key]);
+    }
     set({
       dayTasks: sortByOrder(before.dayTasks),
       backlog: sortByOrder(before.backlog),
       carryOver: before.carryOver,
+      weekTasks: nextWeek,
     });
     try {
       await repo.reorderTasks(orderedIds);
     } catch (err) {
       console.error("Reorder failed; rolling back", err);
-      set(before);
+      set({ ...before, weekTasks: beforeWeek });
       await get().refresh();
     }
   },
@@ -479,6 +518,84 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       await repo.updateTask(id, fields as Record<string, string | number | null>);
       if (needsReload) await get().refresh();
     });
+  },
+
+  scheduleOnSelected: async (id, startTime) => {
+    const selectedDate = get().selectedDate;
+    const beforeWeek = get().weekTasks;
+    const before: TaskBuckets = {
+      dayTasks: get().dayTasks,
+      backlog: get().backlog,
+      carryOver: get().carryOver,
+    };
+    const beforeBacklog = get().backlog;
+
+    // Find the task wherever it currently lives: the day buckets, the backlog,
+    // or any loaded week column.
+    let task: Task | undefined = [
+      ...before.dayTasks,
+      ...before.backlog,
+      ...before.carryOver,
+    ].find((t) => t.id === id);
+    if (!task) {
+      for (const key of Object.keys(beforeWeek)) {
+        const found = beforeWeek[key].find((t) => t.id === id);
+        if (found) {
+          task = found;
+          break;
+        }
+      }
+    }
+    if (!task) return;
+
+    const movingDay = task.planned_date !== selectedDate;
+    const fields: Partial<Task> = {
+      planned_date: selectedDate,
+      scheduled_start: startTime,
+      status: "planned",
+    };
+    const moved: Task = { ...task, ...fields };
+
+    // Relocate the row in the week map: drop it from every column, then append
+    // it to the selected day's column (if that day is loaded). This keeps the
+    // source column from showing it and the target column / timeline in sync.
+    const nextWeek: Record<string, Task[]> = {};
+    for (const key of Object.keys(beforeWeek)) {
+      nextWeek[key] = beforeWeek[key].filter((t) => t.id !== id);
+    }
+    if (nextWeek[selectedDate]) {
+      nextWeek[selectedDate] = [
+        ...nextWeek[selectedDate].filter((t) => t.id !== id),
+        moved,
+      ];
+    }
+
+    // Day buckets: patch in place (handles the common "move an existing block on
+    // the selected day" case), and pull the row in from the backlog if it came
+    // from the Inbox so the selected day's dayTasks shows it immediately.
+    const patchedBuckets = patchTaskInBuckets(before, id, fields);
+    if (movingDay) {
+      // The row was not on the selected day; make sure dayTasks contains it and
+      // the backlog no longer does.
+      const inDay = patchedBuckets.dayTasks.some((t) => t.id === id);
+      if (!inDay) patchedBuckets.dayTasks = [...patchedBuckets.dayTasks, moved];
+      patchedBuckets.backlog = patchedBuckets.backlog.filter(
+        (t) => t.id !== id,
+      );
+    }
+
+    set({ ...patchedBuckets, weekTasks: nextWeek });
+
+    try {
+      await repo.updateTask(
+        id,
+        fields as Record<string, string | number | null>,
+      );
+    } catch (err) {
+      console.error("Schedule on selected failed; rolling back", err);
+      set({ ...before, backlog: beforeBacklog, weekTasks: beforeWeek });
+      await get().refresh();
+    }
   },
 
   unscheduleTask: async (id) => {
