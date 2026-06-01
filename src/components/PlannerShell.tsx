@@ -214,7 +214,11 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
   }
 
   return (
-    <section
+    // Same element type (aside) as the collapsed branch above, so React reuses
+    // the DOM node across collapse/expand and the width transition actually
+    // fires. A section here would be a different element type, so React would
+    // swap nodes and the animation would not run.
+    <aside
       style={{ width, transition: resizing ? "none" : undefined }}
       className="relative flex shrink-0 flex-col border-r border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out"
     >
@@ -269,7 +273,7 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
         defaultWidth={INBOX_DEFAULT_WIDTH}
         onResizingChange={setResizing}
       />
-    </section>
+    </aside>
   );
 }
 
