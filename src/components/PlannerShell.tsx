@@ -185,6 +185,7 @@ export function PlannerShell() {
   const scheduleTask = usePlanner((s) => s.scheduleTask);
   const scheduleOnSelected = usePlanner((s) => s.scheduleOnSelected);
   const detailTaskId = usePlanner((s) => s.detailTaskId);
+  const focusTaskId = usePlanner((s) => s.focusTaskId);
 
   // Drag overlay state: a list pill (column/inbox row) or a lifted block.
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -287,8 +288,9 @@ export function PlannerShell() {
   // modal is open.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      // Do nothing while the detail modal is open.
-      if (detailTaskId != null) return;
+      // Do nothing while the detail modal or Focus (Zen) mode is open. Zen owns
+      // ArrowLeft/Right for prev/next, so the day-nav must not also fire.
+      if (detailTaskId != null || focusTaskId != null) return;
       // Do nothing when typing in an input, textarea, select, or editable node.
       const t = e.target as HTMLElement | null;
       const tag = t?.tagName;
@@ -323,7 +325,7 @@ export function PlannerShell() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, detailTaskId, setDate]);
+  }, [selectedDate, detailTaskId, focusTaskId, setDate]);
 
   const onScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const el = e.currentTarget;

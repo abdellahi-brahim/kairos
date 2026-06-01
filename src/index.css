@@ -70,6 +70,29 @@ body {
   color: #6b7280;
   margin: 0.5em 0;
 }
+/* Focus (Zen) mode reads the same rich text on a dark surface: lighter text,
+   larger base size, and dark-friendly code/quote chrome. */
+.rt-content-zen {
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  color: #e5e7eb;
+}
+.rt-content-zen h1,
+.rt-content-zen h2 {
+  color: #f3f4f6;
+}
+.rt-content-zen code {
+  background: #262626;
+  color: #e5e7eb;
+}
+.rt-content-zen pre {
+  background: #262626;
+}
+.rt-content-zen blockquote {
+  border-left-color: #404040;
+  color: #9ca3af;
+}
+
 /* Placeholder text for the empty editor */
 .rt-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

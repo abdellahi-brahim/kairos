@@ -17,6 +17,7 @@ import { useTimelineWindow } from "./TimelineWindowContext";
 export function TimeBlock({ task }: { task: Task }) {
   const editTask = usePlanner((s) => s.editTask);
   const unschedule = usePlanner((s) => s.unscheduleTask);
+  const openFocus = usePlanner((s) => s.openFocus);
   const win = useTimelineWindow();
 
   const startMin = timeToMinutes(task.scheduled_start!);
@@ -135,20 +136,37 @@ export function TimeBlock({ task }: { task: Task }) {
         durationMin={shownDuration}
         done={done}
         trailing={
-          <button
-            aria-label="Remove from timeline"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={(e) => {
-              e.stopPropagation();
-              unschedule(task.id);
-            }}
-            className={
-              "shrink-0 text-[10px] text-indigo-400 hover:text-indigo-700 " +
-              (hovered ? "opacity-100" : "opacity-0")
-            }
-          >
-            ✕
-          </button>
+          <span className="flex shrink-0 items-center gap-1">
+            <button
+              aria-label="Focus on this task"
+              title="Focus"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                openFocus(task.id);
+              }}
+              className={
+                "text-[10px] text-indigo-400 hover:text-indigo-700 " +
+                (hovered ? "opacity-100" : "opacity-0")
+              }
+            >
+              ◎
+            </button>
+            <button
+              aria-label="Remove from timeline"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation();
+                unschedule(task.id);
+              }}
+              className={
+                "text-[10px] text-indigo-400 hover:text-indigo-700 " +
+                (hovered ? "opacity-100" : "opacity-0")
+              }
+            >
+              ✕
+            </button>
+          </span>
         }
       />
 

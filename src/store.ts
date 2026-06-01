@@ -2,6 +2,7 @@ import { create } from "zustand";
 import type { Comment, Subtask, Task } from "./types";
 import * as repo from "./db";
 import { dayRange, shiftDay, todayKey } from "./lib/date";
+import { timeToMinutes } from "./lib/timeline";
 
 type Bucket = "day" | "backlog";
 
@@ -77,6 +78,55 @@ function patchTaskInBuckets(
   return next;
 }
 
+// Find a task by id wherever it currently lives in memory: the day buckets, the
+// backlog, the carry-over list, or any loaded week column. Used by Focus mode so
+// a task on a non-selected day still resolves.
+function findTaskAnywhere(
+  s: Pick<PlannerState, "dayTasks" | "backlog" | "carryOver" | "weekTasks">,
+  id: number,
+): Task | undefined {
+  const direct = [...s.dayTasks, ...s.backlog, ...s.carryOver].find(
+    (t) => t.id === id,
+  );
+  if (direct) return direct;
+  for (const key of Object.keys(s.weekTasks)) {
+    const found = s.weekTasks[key].find((t) => t.id === id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
+// Build the Focus navigation queue for the focused task: every task on the
+// focused task's day that has a scheduled_start, sorted ascending by start time.
+// Prefer the week map for that day; fall back to dayTasks when the focused
+// task's day is the selected day (and not loaded in the week map). `index` is the
+// position of the focused task in that queue, or -1 if it is not scheduled.
+function buildFocusQueue(
+  s: Pick<
+    PlannerState,
+    "dayTasks" | "backlog" | "carryOver" | "weekTasks" | "selectedDate"
+  >,
+  focusTaskId: number,
+): { queue: Task[]; index: number } {
+  // Zen mode always works the CURRENT day: the queue is today's scheduled
+  // tasks in start-time order, regardless of which day (or an unscheduled
+  // task) focus was entered from. A focused task not in today's queue gets
+  // index -1, so Next jumps to today's first block and Prev is a no-op.
+  const today = todayKey();
+  let dayList = s.weekTasks[today];
+  if (dayList == null && today === s.selectedDate) dayList = s.dayTasks;
+  if (dayList == null) dayList = [];
+
+  const queue = dayList
+    .filter((t) => t.scheduled_start != null)
+    .sort(
+      (a, b) =>
+        timeToMinutes(a.scheduled_start!) - timeToMinutes(b.scheduled_start!),
+    );
+  const index = queue.findIndex((t) => t.id === focusTaskId);
+  return { queue, index };
+}
+
 interface PlannerState {
   // Right-hand Timeline panel collapse state. The week strip takes the full
   // width when collapsed; default is expanded.
@@ -118,6 +168,18 @@ interface PlannerState {
   addSubtask: (title: string) => Promise<void>;
   toggleSubtask: (sub: Subtask) => Promise<void>;
   deleteSubtask: (id: number) => Promise<void>;
+
+  // Focus (Zen) mode. A full-screen, calm single-task surface. The session
+  // timer reuses repo.startTimer / repo.stopRunningTimers, so a focus session is
+  // the only thing that records actual time automatically.
+  focusTaskId: number | null;
+  focusSubtasks: Subtask[];
+  openFocus: (id: number) => Promise<void>;
+  closeFocus: () => Promise<void>;
+  focusNext: () => Promise<void>;
+  focusPrev: () => Promise<void>;
+  completeFocus: () => Promise<void>;
+  toggleFocusSubtask: (sub: Subtask) => Promise<void>;
 
   refresh: () => Promise<void>;
   setDate: (date: string) => Promise<void>;
@@ -176,6 +238,9 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   detailComments: [],
   detailSubtasks: [],
 
+  focusTaskId: null,
+  focusSubtasks: [],
+
   openDetail: async (id) => {
     set({ detailTaskId: id, detailComments: [], detailSubtasks: [] });
     const [comments, subtasks] = await Promise.all([
@@ -222,6 +287,104 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     const id = get().detailTaskId;
     if (id != null) set({ detailSubtasks: await repo.fetchSubtasks(id) });
     await get().refresh();
+  },
+
+  openFocus: async (id) => {
+    // Stop any prior session so its elapsed time is folded in exactly once,
+    // then start the timer on the new task. startTimer also stops others, but we
+    // call stop explicitly to make the "fold once" contract clear.
+    await repo.stopRunningTimers();
+    await repo.startTimer(id);
+    // Optimistically mark the new task as running so the emerald dot shows
+    // immediately, before the background refresh reconciles.
+    const startedAt = new Date().toISOString();
+    set({
+      ...patchTaskInBuckets(
+        {
+          dayTasks: get().dayTasks,
+          backlog: get().backlog,
+          carryOver: get().carryOver,
+        },
+        id,
+        { timer_started_at: startedAt },
+      ),
+      weekTasks: patchTaskInWeek(get().weekTasks, id, {
+        timer_started_at: startedAt,
+      }),
+      focusTaskId: id,
+      focusSubtasks: [],
+    });
+    const subtasks = await repo.fetchSubtasks(id);
+    // Ignore if focus was closed/switched while loading.
+    if (get().focusTaskId === id) set({ focusSubtasks: subtasks });
+    // Reconcile actual_minutes / timer state from disk (a prior running task
+    // gets its folded time, and timer_started_at gets its canonical value).
+    await get().refresh();
+  },
+
+  closeFocus: async () => {
+    await repo.stopRunningTimers();
+    await get().refresh();
+    set({ focusTaskId: null, focusSubtasks: [] });
+  },
+
+  focusNext: async () => {
+    const id = get().focusTaskId;
+    if (id == null) return;
+    const { queue, index } = buildFocusQueue(get(), id);
+    if (queue.length === 0) return;
+    if (index === -1) {
+      // The focused task is not in the scheduled queue (entered from an
+      // unscheduled task): jump to the first scheduled item of its day.
+      await get().openFocus(queue[0].id);
+      return;
+    }
+    const next = queue[index + 1];
+    if (next) await get().openFocus(next.id);
+  },
+
+  focusPrev: async () => {
+    const id = get().focusTaskId;
+    if (id == null) return;
+    const { queue, index } = buildFocusQueue(get(), id);
+    // Unscheduled-entry: Prev does nothing (index === -1).
+    if (queue.length === 0 || index <= 0) return;
+    const prev = queue[index - 1];
+    if (prev) await get().openFocus(prev.id);
+  },
+
+  completeFocus: async () => {
+    const id = get().focusTaskId;
+    if (id == null) return;
+    // Capture the queue + current index BEFORE completing (completion may change
+    // the task's done state and reorder things).
+    const { queue, index } = buildFocusQueue(get(), id);
+    const current = findTaskAnywhere(get(), id);
+    if (!current) {
+      await get().closeFocus();
+      return;
+    }
+    // toggleComplete stops the running timer and folds the elapsed time in.
+    await get().toggleComplete(current);
+    // Advance to the next item in the pre-captured queue order whose status is
+    // not done. Start searching after the current index (or from the start if
+    // the current task was not in the queue).
+    const startAt = index === -1 ? 0 : index + 1;
+    for (let i = startAt; i < queue.length; i++) {
+      const candidate = findTaskAnywhere(get(), queue[i].id);
+      if (candidate && candidate.status !== "done") {
+        await get().openFocus(candidate.id);
+        return;
+      }
+    }
+    await get().closeFocus();
+  },
+
+  toggleFocusSubtask: async (sub) => {
+    await repo.setSubtaskDone(sub.id, !sub.done);
+    const id = get().focusTaskId;
+    if (id != null) set({ focusSubtasks: await repo.fetchSubtasks(id) });
+    await get().refresh(); // update the card progress chip
   },
 
   refresh: async () => {

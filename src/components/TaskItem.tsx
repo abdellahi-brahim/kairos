@@ -41,6 +41,7 @@ export function TaskItem({
   const toggleComplete = usePlanner((s) => s.toggleComplete);
   const removeTask = usePlanner((s) => s.removeTask);
   const openDetail = usePlanner((s) => s.openDetail);
+  const openFocus = usePlanner((s) => s.openFocus);
 
   // JS-driven hover: WKWebView leaves CSS :hover stuck after a drag.
   const [hovered, setHovered] = useState(false);
@@ -150,6 +151,20 @@ export function TaskItem({
           }
         >
           {task.title}
+        </button>
+
+        <button
+          aria-label="Focus on this task"
+          title="Focus"
+          // Stop the drag from starting when pressing this control.
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => openFocus(task.id)}
+          className={
+            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-neutral-400 hover:bg-indigo-50 hover:text-indigo-600 " +
+            (hovered ? "opacity-100" : "opacity-0")
+          }
+        >
+          ◎
         </button>
 
         <button

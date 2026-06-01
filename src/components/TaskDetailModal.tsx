@@ -40,6 +40,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
   const editTaskQuiet = usePlanner((s) => s.editTaskQuiet);
   const removeTask = usePlanner((s) => s.removeTask);
   const toggleComplete = usePlanner((s) => s.toggleComplete);
+  const openFocus = usePlanner((s) => s.openFocus);
   const comments = usePlanner((s) => s.detailComments);
   const addComment = usePlanner((s) => s.addComment);
   const deleteComment = usePlanner((s) => s.deleteComment);
@@ -113,6 +114,16 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             }
           />
           <button
+            onClick={() => {
+              openFocus(task.id);
+              close();
+            }}
+            title="Focus on this task"
+            className="mt-0.5 shrink-0 rounded bg-indigo-500 px-2 py-1 text-[11px] font-medium leading-none text-white hover:bg-indigo-600"
+          >
+            ◎ Focus
+          </button>
+          <button
             onClick={doClose}
             aria-label="Close"
             className="mt-0.5 shrink-0 rounded p-1 text-[11px] leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
@@ -139,7 +150,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
               />
             </Meta>
             <Meta label="Tracked">
-              <TimerControl task={task} revealed />
+              <TimerControl task={task} />
             </Meta>
             {task.scheduled_start && (
               <Meta label="Scheduled">
