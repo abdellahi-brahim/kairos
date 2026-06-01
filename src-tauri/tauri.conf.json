@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "daily-planner",
+  "productName": "Kairos",
   "version": "0.1.0",
   "identifier": "com.abdoul.dailyplanner",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Daily Planner",
+        "title": "Kairos",
         "width": 1100,
         "height": 760,
         "minWidth": 880,
