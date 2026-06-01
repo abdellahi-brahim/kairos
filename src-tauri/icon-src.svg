@@ -1,0 +1,21 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6366f1"/>
+      <stop offset="1" stop-color="#4338ca"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded-square app surface (macOS icons carry their own shape + padding) -->
+  <rect x="100" y="100" width="824" height="824" rx="185" ry="185" fill="url(#bg)"/>
+
+  <!-- Clock dial -->
+  <circle cx="512" cy="512" r="250" fill="none" stroke="#ffffff" stroke-width="30"/>
+
+  <!-- The "kairos" moment: a single filled wedge (12 o'clock to 2 o'clock) -->
+  <path d="M 512 512 L 512 277 A 235 235 0 0 1 715.5 394.5 Z" fill="#ffffff"/>
+
+  <!-- Center hub -->
+  <circle cx="512" cy="512" r="30" fill="#4338ca"/>
+  <circle cx="512" cy="512" r="30" fill="none" stroke="#ffffff" stroke-width="10"/>
+</svg>
