@@ -514,40 +514,41 @@ export function PlannerShell() {
 
   return (
     <div className="flex h-full flex-col bg-neutral-50 text-neutral-800">
-      {/* Thin top bar: title + a jump-to-today affordance (the week strip and
-          column-header selection are the primary navigation now). */}
-      <header className="flex items-center justify-between border-b border-neutral-200 bg-white px-3 py-1">
-        <h1 className="text-[12px] font-semibold tracking-tight text-neutral-700">
-          Planner
-        </h1>
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => focusDayStartId != null && openFocus(focusDayStartId)}
-            disabled={focusDayStartId == null}
-            title={
-              focusDayStartId != null
-                ? "Focus today's scheduled tasks one at a time"
-                : "Plan a task on the timeline to focus your day"
-            }
-            className={
-              "rounded border px-1.5 py-0.5 text-[11px] font-medium " +
-              (focusDayStartId != null
-                ? "border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-                : "cursor-default border-neutral-200 text-neutral-300")
-            }
-          >
-            ▶ Focus day
-          </button>
-          <button
-            onClick={() => {
-              if (!isToday) setDate(todayKey());
-              scrollToToday();
-            }}
-            className="rounded border border-neutral-200 px-1.5 py-0.5 text-[11px] text-neutral-600 hover:bg-neutral-100"
-          >
-            Jump to today
-          </button>
-        </div>
+      {/* This bar IS the native macOS titlebar (titleBarStyle Overlay). The
+          webview extends under it; the traffic lights float over the top-left,
+          so we left-pad past them and left-align our controls. The empty space
+          to the right is draggable window chrome (data-tauri-drag-region); the
+          buttons are normal interactive children and stay clickable. */}
+      <header
+        data-tauri-drag-region
+        className="flex h-9 shrink-0 items-center gap-1.5 border-b border-neutral-200 bg-white pl-[78px] pr-3"
+      >
+        <button
+          onClick={() => focusDayStartId != null && openFocus(focusDayStartId)}
+          disabled={focusDayStartId == null}
+          title={
+            focusDayStartId != null
+              ? "Focus today's scheduled tasks one at a time"
+              : "Plan a task on the timeline to focus your day"
+          }
+          className={
+            "rounded border px-1.5 py-0.5 text-[11px] font-medium " +
+            (focusDayStartId != null
+              ? "border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+              : "cursor-default border-neutral-200 text-neutral-300")
+          }
+        >
+          ▶ Focus day
+        </button>
+        <button
+          onClick={() => {
+            if (!isToday) setDate(todayKey());
+            scrollToToday();
+          }}
+          className="rounded border border-neutral-200 px-1.5 py-0.5 text-[11px] text-neutral-600 hover:bg-neutral-100"
+        >
+          Jump to today
+        </button>
       </header>
 
       <DndContext
