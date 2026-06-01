@@ -74,6 +74,33 @@ const collisionDetection: CollisionDetection = (args) => {
 // Pixels from the right edge at which to load more future day columns.
 const EXTEND_THRESHOLD_PX = 600;
 
+// Current local minute-of-day (hours*60 + minutes).
+function nowMinutes(): number {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
+
+// Pick the task to start a "Focus day" run on, from today's tasks. Considers
+// only scheduled, not-done tasks: prefers the block containing the current time
+// (earliest start on overlap), else the earliest by start. Returns null when
+// nothing today is both scheduled and open (the button then disables).
+function pickFocusDayStart(tasks: Task[]): number | null {
+  const candidates = tasks
+    .filter((t) => t.scheduled_start != null && t.status !== "done")
+    .sort(
+      (a, b) =>
+        timeToMinutes(a.scheduled_start!) - timeToMinutes(b.scheduled_start!),
+    );
+  if (candidates.length === 0) return null;
+  const nowMin = nowMinutes();
+  for (const t of candidates) {
+    const start = timeToMinutes(t.scheduled_start!);
+    const end = start + (t.estimate_minutes ?? DEFAULT_BLOCK_MIN);
+    if (start <= nowMin && nowMin < end) return t.id;
+  }
+  return candidates[0].id;
+}
+
 // The pinned Inbox column on the far left (does not scroll with the week strip).
 function InboxColumn({ tasks }: { tasks: Task[] }) {
   const addToBacklog = usePlanner((s) => s.addToBacklog);
@@ -186,6 +213,7 @@ export function PlannerShell() {
   const scheduleOnSelected = usePlanner((s) => s.scheduleOnSelected);
   const detailTaskId = usePlanner((s) => s.detailTaskId);
   const focusTaskId = usePlanner((s) => s.focusTaskId);
+  const openFocus = usePlanner((s) => s.openFocus);
 
   // Drag overlay state: a list pill (column/inbox row) or a lifted block.
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -477,6 +505,13 @@ export function PlannerShell() {
 
   const isToday = selectedDate === todayKey();
 
+  // "Focus day" is always a TODAY action regardless of the selected column.
+  // Today's tasks live in the week map (today is always inside the loaded
+  // window); fall back to dayTasks when today is the selected day.
+  const today = todayKey();
+  const todaysTasks = weekTasks[today] ?? (isToday ? dayTasks : []);
+  const focusDayStartId = pickFocusDayStart(todaysTasks);
+
   return (
     <div className="flex h-full flex-col bg-neutral-50 text-neutral-800">
       {/* Thin top bar: title + a jump-to-today affordance (the week strip and
@@ -485,15 +520,34 @@ export function PlannerShell() {
         <h1 className="text-[12px] font-semibold tracking-tight text-neutral-700">
           Planner
         </h1>
-        <button
-          onClick={() => {
-            if (!isToday) setDate(todayKey());
-            scrollToToday();
-          }}
-          className="rounded border border-neutral-200 px-1.5 py-0.5 text-[11px] text-neutral-600 hover:bg-neutral-100"
-        >
-          Jump to today
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => focusDayStartId != null && openFocus(focusDayStartId)}
+            disabled={focusDayStartId == null}
+            title={
+              focusDayStartId != null
+                ? "Focus today's scheduled tasks one at a time"
+                : "Plan a task on the timeline to focus your day"
+            }
+            className={
+              "rounded border px-1.5 py-0.5 text-[11px] font-medium " +
+              (focusDayStartId != null
+                ? "border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                : "cursor-default border-neutral-200 text-neutral-300")
+            }
+          >
+            ▶ Focus day
+          </button>
+          <button
+            onClick={() => {
+              if (!isToday) setDate(todayKey());
+              scrollToToday();
+            }}
+            className="rounded border border-neutral-200 px-1.5 py-0.5 text-[11px] text-neutral-600 hover:bg-neutral-100"
+          >
+            Jump to today
+          </button>
+        </div>
       </header>
 
       <DndContext
