@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -12,6 +13,8 @@ import {
   weekdayShort,
 } from "../lib/date";
 import { TaskItem } from "./TaskItem";
+import { DoneRow } from "./DoneRow";
+import { OverdueBand } from "./OverdueBand";
 import { AddTask } from "./AddTask";
 
 interface DayColumnProps {
@@ -19,25 +22,65 @@ interface DayColumnProps {
   tasks: Task[];
 }
 
+// How long the leaving (fade + collapse) animation runs before a completed task
+// is partitioned into the Done group. Matches the CSS transition duration below.
+const COMPLETE_ANIM_MS = 150;
+
 // One day in the unified week strip: a thin header (weekday + date, Today
 // marker, open-task estimate total) over a task list and an inline add. Clicking
 // the header SELECTS this day, which drives the right-hand Timeline panel and
 // is highlighted here. The whole column is a droppable so a task can be dragged
-// onto an empty day; rows are sortable for in-column reordering.
+// onto an empty day; rows are sortable for in-column reordering. Today's column
+// also shows an Overdue band of carry-over tasks at the top. Done tasks are
+// demoted to a collapsed "Done" group at the bottom.
 export function DayColumn({ date, tasks }: DayColumnProps) {
   const setDate = usePlanner((s) => s.setDate);
   const selectedDate = usePlanner((s) => s.selectedDate);
   const addToWeekDay = usePlanner((s) => s.addToWeekDay);
+  const toggleComplete = usePlanner((s) => s.toggleComplete);
 
   const { setNodeRef, isOver } = useDroppable({
     id: `col-${date}`,
     data: { type: "column", date },
   });
 
+  // Ids mid-completion: still in the open list (status not yet flipped) but
+  // playing the leaving animation. The timeout flips status via toggleComplete,
+  // which moves the row into the Done group on the next render.
+  const [leaving, setLeaving] = useState<Set<number>>(new Set());
+  const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+  // Done group is collapsed by default so finished work stays out of the way.
+  const [doneOpen, setDoneOpen] = useState(false);
+
+  useEffect(() => {
+    const map = timers.current;
+    return () => {
+      for (const t of map.values()) clearTimeout(t);
+      map.clear();
+    };
+  }, []);
+
+  const beginComplete = (task: Task) => {
+    if (timers.current.has(task.id)) return;
+    setLeaving((prev) => new Set(prev).add(task.id));
+    const handle = setTimeout(() => {
+      timers.current.delete(task.id);
+      toggleComplete(task);
+      setLeaving((prev) => {
+        const next = new Set(prev);
+        next.delete(task.id);
+        return next;
+      });
+    }, COMPLETE_ANIM_MS);
+    timers.current.set(task.id, handle);
+  };
+
   const isToday = date === todayKey();
   const isSelected = date === selectedDate;
+  // A row that is mid-completion stays in the open (sortable) list until its
+  // animation finishes, so it does not double-count or jump into Done early.
   const open = tasks.filter((t) => t.status !== "done");
-  const doneCount = tasks.length - open.length;
+  const done = tasks.filter((t) => t.status === "done");
   const plannedMinutes = open.reduce(
     (sum, t) => sum + (t.estimate_minutes ?? 0),
     0,
@@ -90,30 +133,73 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
           (isOver ? "bg-indigo-50/60" : "")
         }
       >
+        {isToday && <OverdueBand />}
+
         <div className="mb-0.5 flex items-baseline justify-between px-1">
           <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
-            {open.length} open{doneCount > 0 ? ` · ${doneCount} done` : ""}
+            {open.length} open
           </span>
         </div>
 
-        {tasks.length === 0 ? (
+        {open.length === 0 ? (
           <p className="px-1 py-1.5 text-[11px] text-neutral-300">No tasks.</p>
         ) : (
           <SortableContext
-            items={tasks.map((t) => t.id)}
+            items={open.map((t) => t.id)}
             strategy={verticalListSortingStrategy}
           >
             <ul className="flex flex-col gap-1">
-              {tasks.map((task) => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  bucket="day"
-                  column={date}
-                />
-              ))}
+              {open.map((task) => {
+                const isLeaving = leaving.has(task.id);
+                return (
+                  // The wrapper plays the leaving animation; TaskItem keeps its
+                  // own sortable <li> as the dnd node. max-height is generous so
+                  // a normal row is unconstrained and only the collapse animates.
+                  <div
+                    key={task.id}
+                    style={{
+                      maxHeight: isLeaving ? 0 : 400,
+                      opacity: isLeaving ? 0 : 1,
+                      transform: isLeaving ? "translateX(6px)" : "none",
+                      overflow: "hidden",
+                      transition:
+                        "max-height 150ms ease, opacity 150ms ease, transform 150ms ease",
+                    }}
+                  >
+                    <TaskItem
+                      task={task}
+                      bucket="day"
+                      column={date}
+                      onComplete={beginComplete}
+                    />
+                  </div>
+                );
+              })}
             </ul>
           </SortableContext>
+        )}
+
+        {done.length > 0 && (
+          <div className="mt-1.5">
+            <button
+              onClick={() => setDoneOpen((v) => !v)}
+              className="flex w-full items-center gap-1 px-1 py-0.5 text-left"
+            >
+              <span className="text-[9px] leading-none text-neutral-400">
+                {doneOpen ? "▾" : "▸"}
+              </span>
+              <span className="text-[9px] font-semibold uppercase tracking-wide text-neutral-400">
+                Done ({done.length})
+              </span>
+            </button>
+            {doneOpen && (
+              <ul className="mt-1 flex flex-col gap-1">
+                {done.map((task) => (
+                  <DoneRow key={task.id} task={task} />
+                ))}
+              </ul>
+            )}
+          </div>
         )}
 
         <div className="mt-1 px-0.5">
