@@ -4,6 +4,7 @@ import type { Task } from "../types";
 import { formatDuration, todayKey } from "../lib/date";
 import { DEFAULT_BLOCK_MIN, timeToMinutes } from "../lib/timeline";
 import { Checkbox } from "./Checkbox";
+import { openFocusWidget } from "../lib/focusBridge";
 
 // Current local minute-of-day (hours*60 + minutes).
 function nowMinutes(): number {
@@ -203,8 +204,15 @@ export function ZenMode() {
   return (
     <div className="fixed inset-0 z-[60] overflow-y-auto bg-neutral-900 text-neutral-100">
       <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-8 py-10">
-        {/* Top bar: Exit. */}
-        <div className="mb-10 flex items-center justify-end">
+        {/* Top bar: Pop out + Exit. */}
+        <div className="mb-10 flex items-center justify-end gap-1">
+          <button
+            onClick={() => void openFocusWidget()}
+            className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"
+          >
+            <span aria-hidden>⤢</span>
+            Pop out
+          </button>
           <button
             onClick={() => closeFocus()}
             className="flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[13px] text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100"

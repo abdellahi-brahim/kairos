@@ -8,6 +8,9 @@
   "permissions": [
     "core:default",
     "core:window:allow-start-dragging",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-close",
+    "core:window:allow-set-focus",
     "opener:default",
     "opener:allow-open-path",
     "sql:default",

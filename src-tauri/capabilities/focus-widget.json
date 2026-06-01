@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "focus-widget",
+  "description": "Capability for the floating Focus widget window. Thin subscriber: it listens for focus-state, emits focus-intent, can be dragged by its frameless body, and can close/raise itself. It never touches the DB.",
+  "windows": [
+    "focus-widget"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-set-focus",
+    "core:window:allow-show",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-visible-on-all-workspaces"
+  ]
+}
