@@ -104,7 +104,7 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
             items={tasks.map((t) => t.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="flex flex-col gap-px">
+            <ul className="flex flex-col gap-1">
               {tasks.map((task) => (
                 <TaskItem
                   key={task.id}

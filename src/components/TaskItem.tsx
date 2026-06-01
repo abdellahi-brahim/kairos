@@ -6,14 +6,17 @@ import { usePlanner } from "../store";
 import { formatDuration } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
 import { parseTags, tagColor } from "../lib/tags";
+import { htmlToPlainText } from "../lib/text";
 
 // A dense, title-first task row shared by every column (Inbox + day columns).
 //
-// Layout: a title line where the title always wins for space (it truncates LAST,
-// never to "F..."), preceded only by the small fixed-width controls (drag
-// handle, checkbox, priority dot). All secondary metadata (scheduled time,
-// estimate, tags, tracked time, subtasks) lives on a compact, de-emphasized
-// second footer line that wraps/shrinks instead of stealing the title's width.
+// Layout (vertical flex): a title line where the title always wins for space and
+// wraps to up to 3 lines (line-clamp, never collapsing to "F..."), preceded only
+// by the small fixed-width controls (drag handle, checkbox, priority dot); an
+// optional muted notes snippet; then a compact, de-emphasized footer with all
+// secondary metadata (scheduled time, estimate, tags, tracked time, subtasks).
+// A bare task (no notes, no metadata) stays a tight near-single-line row; the
+// card only grows as content requires.
 export function TaskItem({
   task,
   bucket,
@@ -46,6 +49,10 @@ export function TaskItem({
   const tags = parseTags(task.tags);
   const open = () => openDetail(task.id);
 
+  // Notes are rich-text HTML (TipTap). Strip to plain text for a safe preview;
+  // render the snippet only when there is actual text after stripping.
+  const snippet = htmlToPlainText(task.notes);
+
   // Whether any footer metadata exists. Keeps the row to a single line when a
   // task is bare (the common Inbox case), preserving vertical density.
   const hasMeta =
@@ -63,46 +70,54 @@ export function TaskItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        "rounded border px-1 py-0.5 " +
-        (hovered ? "border-neutral-200 bg-white" : "border-transparent")
+        // Every card carries a visible border + white surface + padding so
+        // cards read as distinct units; hover just emphasizes.
+        "rounded-md border bg-white px-2 py-1.5 " +
+        (hovered ? "border-neutral-300 shadow-sm" : "border-neutral-200")
       }
     >
-      {/* Title line: controls are fixed-width, the title flex-grows + truncates. */}
-      <div className="flex items-center gap-1.5">
+      {/* Title line: controls are fixed-width; the title flex-grows and wraps to
+          up to 3 lines. Controls top-align so they sit on the first title line
+          when it wraps. The h-5 wrappers keep them vertically centered on a
+          single-line title, preserving the dense one-row look for bare tasks. */}
+      <div className="flex items-start gap-1.5">
         <button
           {...attributes}
           {...listeners}
           aria-label="Drag to reorder"
           className={
-            "shrink-0 cursor-grab text-[11px] leading-none text-neutral-300 transition-opacity " +
+            "flex h-5 shrink-0 cursor-grab items-center text-[11px] leading-none text-neutral-300 transition-opacity " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
           ⠿
         </button>
 
-        <input
-          type="checkbox"
-          checked={done}
-          onChange={() => toggleComplete(task)}
-          className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-indigo-500"
-        />
+        <span className="flex h-5 shrink-0 items-center">
+          <input
+            type="checkbox"
+            checked={done}
+            onChange={() => toggleComplete(task)}
+            className="h-3.5 w-3.5 cursor-pointer accent-indigo-500"
+          />
+        </span>
 
         {task.priority > 0 && (
-          <span
-            title={`${priorityMeta(task.priority).label} priority`}
-            className={
-              "h-1.5 w-1.5 shrink-0 rounded-full " +
-              priorityMeta(task.priority).dot
-            }
-          />
+          <span className="flex h-5 shrink-0 items-center">
+            <span
+              title={`${priorityMeta(task.priority).label} priority`}
+              className={
+                "h-1.5 w-1.5 rounded-full " + priorityMeta(task.priority).dot
+              }
+            />
+          </span>
         )}
 
         <button
           onClick={open}
           title={task.title}
           className={
-            "min-w-0 flex-1 truncate text-left text-[13px] leading-5 " +
+            "min-w-0 flex-1 line-clamp-3 text-left text-[13px] leading-5 " +
             (done ? "text-neutral-400 line-through" : "text-neutral-800")
           }
         >
@@ -113,13 +128,22 @@ export function TaskItem({
           aria-label="Delete task"
           onClick={() => removeTask(task.id)}
           className={
-            "shrink-0 rounded px-1 text-[11px] leading-none text-neutral-400 hover:bg-red-50 hover:text-red-500 " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-neutral-400 hover:bg-red-50 hover:text-red-500 " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
           ✕
         </button>
       </div>
+
+      {/* Notes preview: a muted 1-2 line plain-text snippet, shown only when the
+          task has notes. Indented to align under the title. Rich-text HTML is
+          stripped to text (never rendered raw) by htmlToPlainText. */}
+      {snippet && (
+        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[10px] leading-snug text-neutral-400">
+          {snippet}
+        </p>
+      )}
 
       {/* Footer: compact, muted metadata. Indented to align under the title,
           shrinks/wraps rather than crowding the title above it. */}
