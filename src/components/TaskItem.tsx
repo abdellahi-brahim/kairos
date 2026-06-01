@@ -76,7 +76,8 @@ export function TaskItem({
     tags.length > 0 ||
     running ||
     task.actual_minutes > 0 ||
-    (!!task.subtask_total && task.subtask_total > 0);
+    (!!task.subtask_total && task.subtask_total > 0) ||
+    (!!task.attachment_count && task.attachment_count > 0);
 
   // Priority left rail: a 2px colored left border. border-left-color is more
   // specific than the hover's generic border-color swap, so the rail color stays
@@ -228,6 +229,15 @@ export function TaskItem({
               className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
             >
               ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+            </button>
+          )}
+          {!!task.attachment_count && task.attachment_count > 0 && (
+            <button
+              onClick={open}
+              title="Attachments"
+              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
+            >
+              📎 {task.attachment_count}
             </button>
           )}
           {tags.slice(0, 2).map((t) => (

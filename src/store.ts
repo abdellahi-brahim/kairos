@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { Comment, Subtask, Task } from "./types";
+import { invoke } from "@tauri-apps/api/core";
+import type { Attachment, Comment, Subtask, Task } from "./types";
 import * as repo from "./db";
 import { dayRange, shiftDay, todayKey } from "./lib/date";
 import { timeToMinutes } from "./lib/timeline";
@@ -186,6 +187,7 @@ interface PlannerState {
   detailTaskId: number | null;
   detailComments: Comment[];
   detailSubtasks: Subtask[];
+  detailAttachments: Attachment[];
   openDetail: (id: number) => Promise<void>;
   closeDetail: () => void;
   addComment: (body: string) => Promise<void>;
@@ -193,6 +195,10 @@ interface PlannerState {
   addSubtask: (title: string) => Promise<void>;
   toggleSubtask: (sub: Subtask) => Promise<void>;
   deleteSubtask: (id: number) => Promise<void>;
+  // Copy one or more source files into the task's local attachment store, then
+  // persist a row per file and reload the list. No-op when no task is open.
+  addAttachments: (srcPaths: string[]) => Promise<void>;
+  deleteAttachment: (id: number) => Promise<void>;
 
   // Focus (Zen) mode. A full-screen, calm single-task surface. The session
   // timer reuses repo.startTimer / repo.stopRunningTimers, so a focus session is
@@ -298,22 +304,39 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   detailTaskId: null,
   detailComments: [],
   detailSubtasks: [],
+  detailAttachments: [],
 
   focusTaskId: null,
   focusSubtasks: [],
 
   openDetail: async (id) => {
-    set({ detailTaskId: id, detailComments: [], detailSubtasks: [] });
-    const [comments, subtasks] = await Promise.all([
+    set({
+      detailTaskId: id,
+      detailComments: [],
+      detailSubtasks: [],
+      detailAttachments: [],
+    });
+    const [comments, subtasks, attachments] = await Promise.all([
       repo.fetchComments(id),
       repo.fetchSubtasks(id),
+      repo.fetchAttachments(id),
     ]);
     // Ignore if the modal was closed/switched while loading.
-    if (get().detailTaskId === id) set({ detailComments: comments, detailSubtasks: subtasks });
+    if (get().detailTaskId === id)
+      set({
+        detailComments: comments,
+        detailSubtasks: subtasks,
+        detailAttachments: attachments,
+      });
   },
 
   closeDetail: () =>
-    set({ detailTaskId: null, detailComments: [], detailSubtasks: [] }),
+    set({
+      detailTaskId: null,
+      detailComments: [],
+      detailSubtasks: [],
+      detailAttachments: [],
+    }),
 
   addComment: async (body) => {
     const id = get().detailTaskId;
@@ -347,6 +370,48 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     await repo.deleteSubtask(subId);
     const id = get().detailTaskId;
     if (id != null) set({ detailSubtasks: await repo.fetchSubtasks(id) });
+    await get().refresh();
+  },
+
+  addAttachments: async (srcPaths) => {
+    const id = get().detailTaskId;
+    if (id == null || srcPaths.length === 0) return;
+    for (const srcPath of srcPaths) {
+      // The Rust command copies the file into attachments/<task_id>/ and returns
+      // the row metadata; we persist it (the DB owns created_at).
+      const meta = await invoke<{
+        filename: string;
+        rel_path: string;
+        mime: string | null;
+        size_bytes: number;
+      }>("import_attachment", { taskId: id, srcPath });
+      await repo.insertAttachment({
+        task_id: id,
+        filename: meta.filename,
+        rel_path: meta.rel_path,
+        mime: meta.mime,
+        size_bytes: meta.size_bytes,
+        created_at: new Date().toISOString(),
+      });
+    }
+    if (get().detailTaskId === id)
+      set({ detailAttachments: await repo.fetchAttachments(id) });
+    await get().refresh(); // update the card attachment_count chip
+  },
+
+  deleteAttachment: async (attId) => {
+    const att = get().detailAttachments.find((a) => a.id === attId);
+    if (att) {
+      // Best-effort file removal; the row delete is the source of truth.
+      try {
+        await invoke("delete_attachment_file", { relPath: att.rel_path });
+      } catch (err) {
+        console.error("Attachment file delete failed", err);
+      }
+    }
+    await repo.deleteAttachment(attId);
+    const id = get().detailTaskId;
+    if (id != null) set({ detailAttachments: await repo.fetchAttachments(id) });
     await get().refresh();
   },
 
@@ -662,7 +727,14 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     // Drop from the week map in memory so a delete from a Week column takes
     // effect immediately (refresh only reloads the Day buckets + backlog).
     set({ weekTasks: removeTaskFromWeek(get().weekTasks, id) });
+    // db.deleteTask clears the attachment rows; also remove the files on disk
+    // (best-effort, ignore errors so a delete is never blocked by the FS).
     await repo.deleteTask(id);
+    try {
+      await invoke("delete_attachments_dir", { taskId: id });
+    } catch (err) {
+      console.error("Attachment dir cleanup failed", err);
+    }
     await get().refresh();
   },
 

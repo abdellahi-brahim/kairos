@@ -20,6 +20,7 @@ export interface Task {
   // Computed in fetch queries (not stored columns):
   subtask_total?: number;
   subtask_done?: number;
+  attachment_count?: number;
 }
 
 export interface Subtask {
@@ -35,5 +36,15 @@ export interface Comment {
   id: number;
   task_id: number;
   body: string;
+  created_at: string;
+}
+
+export interface Attachment {
+  id: number;
+  task_id: number;
+  filename: string;
+  rel_path: string;
+  mime: string | null;
+  size_bytes: number;
   created_at: string;
 }

@@ -1,5 +1,5 @@
 import Database from "@tauri-apps/plugin-sql";
-import type { Comment, Subtask, Task } from "./types";
+import type { Attachment, Comment, Subtask, Task } from "./types";
 
 // Single shared connection to the SQLite database. The file lives in the app's
 // data directory; the schema/migrations are defined Rust-side in
@@ -17,9 +17,11 @@ const COLUMNS =
   "id, title, notes, status, planned_date, scheduled_start, estimate_minutes, actual_minutes, sort_order, created_at, completed_at, timer_started_at, priority, tags";
 
 // Correlated subtask counts, appended to task selects for the row progress chip.
+// The attachment count drives the paperclip chip the same way.
 const SUBTASK_COUNTS =
   ", (SELECT COUNT(*) FROM subtasks s WHERE s.task_id = tasks.id) AS subtask_total" +
-  ", (SELECT COUNT(*) FROM subtasks s WHERE s.task_id = tasks.id AND s.done = 1) AS subtask_done";
+  ", (SELECT COUNT(*) FROM subtasks s WHERE s.task_id = tasks.id AND s.done = 1) AS subtask_done" +
+  ", (SELECT COUNT(*) FROM attachments a WHERE a.task_id = tasks.id) AS attachment_count";
 
 export async function fetchTasksForDate(date: string): Promise<Task[]> {
   const db = await getDb();
@@ -121,6 +123,7 @@ export async function deleteTask(id: number): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM comments WHERE task_id = $1", [id]);
   await db.execute("DELETE FROM subtasks WHERE task_id = $1", [id]);
+  await deleteAttachmentsForTask(id);
   await db.execute("DELETE FROM tasks WHERE id = $1", [id]);
 }
 
@@ -176,6 +179,49 @@ export async function addComment(taskId: number, body: string): Promise<void> {
 export async function deleteComment(id: number): Promise<void> {
   const db = await getDb();
   await db.execute("DELETE FROM comments WHERE id = $1", [id]);
+}
+
+export async function fetchAttachments(taskId: number): Promise<Attachment[]> {
+  const db = await getDb();
+  return db.select<Attachment[]>(
+    "SELECT id, task_id, filename, rel_path, mime, size_bytes, created_at FROM attachments WHERE task_id = $1 ORDER BY created_at ASC, id ASC",
+    [taskId],
+  );
+}
+
+export async function insertAttachment(input: {
+  task_id: number;
+  filename: string;
+  rel_path: string;
+  mime: string | null;
+  size_bytes: number;
+  created_at: string;
+}): Promise<void> {
+  const db = await getDb();
+  await db.execute(
+    "INSERT INTO attachments (task_id, filename, rel_path, mime, size_bytes, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+    [
+      input.task_id,
+      input.filename,
+      input.rel_path,
+      input.mime,
+      input.size_bytes,
+      input.created_at,
+    ],
+  );
+}
+
+export async function deleteAttachment(id: number): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM attachments WHERE id = $1", [id]);
+}
+
+// Remove every attachment row for a task (the files are cleaned up separately
+// via the delete_attachments_dir Tauri command). Called on task delete so no
+// orphan rows remain.
+export async function deleteAttachmentsForTask(taskId: number): Promise<void> {
+  const db = await getDb();
+  await db.execute("DELETE FROM attachments WHERE task_id = $1", [taskId]);
 }
 
 // Persist a new manual ordering for a set of tasks.

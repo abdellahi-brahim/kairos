@@ -5,6 +5,7 @@ import { EstimatePicker } from "./EstimatePicker";
 import { TimerControl } from "./TimerControl";
 import { RichTextEditor } from "./RichTextEditor";
 import { SubtaskList } from "./SubtaskList";
+import { AttachmentList } from "./AttachmentList";
 import { PriorityPicker } from "./PriorityPicker";
 import { TagEditor } from "./TagEditor";
 import { Checkbox } from "./Checkbox";
@@ -180,6 +181,11 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
           {/* Subtasks */}
           <div className="mt-4">
             <SubtaskList />
+          </div>
+
+          {/* Attachments */}
+          <div className="mt-4">
+            <AttachmentList />
           </div>
 
           {/* Comments */}
