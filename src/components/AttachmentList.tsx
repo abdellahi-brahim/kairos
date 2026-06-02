@@ -58,12 +58,12 @@ function AttachmentRow({
     <li
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className="group flex items-center gap-2 rounded px-1 py-1 hover:bg-neutral-50"
+      className="group flex items-center gap-2 rounded px-1 py-1 hover:bg-surface"
     >
       <button
         onClick={openFile}
         title={`Open ${att.filename}`}
-        className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-neutral-200 bg-neutral-50 text-[13px] text-neutral-400"
+        className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded border border-hairline bg-surface text-[13px] text-muted"
       >
         {image && thumbUrl ? (
           <img
@@ -79,19 +79,19 @@ function AttachmentRow({
       <button
         onClick={openFile}
         title={att.filename}
-        className="min-w-0 flex-1 truncate text-left text-[14px] text-neutral-700 hover:text-indigo-600"
+        className="min-w-0 flex-1 truncate text-left text-[14px] text-text hover:text-accent"
       >
         {att.filename}
       </button>
 
-      <span className="shrink-0 tabular-nums text-[10px] text-neutral-400">
+      <span className="shrink-0 tabular-nums text-[10px] text-muted">
         {formatBytes(att.size_bytes)}
       </span>
 
       <button
         onClick={openFile}
         className={
-          "shrink-0 text-[10px] text-neutral-400 hover:text-indigo-600 " +
+          "shrink-0 text-[10px] text-muted hover:text-accent " +
           (hovered ? "opacity-100" : "opacity-0")
         }
       >
@@ -102,7 +102,7 @@ function AttachmentRow({
         onClick={onDelete}
         aria-label="Remove attachment"
         className={
-          "shrink-0 text-[10px] text-neutral-300 hover:text-red-500 " +
+          "shrink-0 text-[10px] text-faint hover:text-alert " +
           (hovered ? "opacity-100" : "opacity-0")
         }
       >
@@ -170,18 +170,18 @@ export function AttachmentList() {
 
   return (
     <div>
-      <h3 className="mb-1.5 flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+      <h3 className="mb-1.5 flex items-center justify-between text-[12px] font-medium text-muted">
         <span className="flex items-center gap-2">
           Attachments
           {attachments.length > 0 && (
-            <span className="font-medium tabular-nums text-neutral-400">
+            <span className="tabular-nums text-muted">
               {attachments.length}
             </span>
           )}
         </span>
         <button
           onClick={pickFiles}
-          className="rounded bg-neutral-100 px-2 py-0.5 text-[10px] font-medium normal-case text-neutral-600 hover:bg-neutral-200"
+          className="rounded bg-soft px-2 py-0.5 text-[10px] font-medium text-text hover:bg-hairline"
         >
           Add files
         </button>
@@ -189,7 +189,7 @@ export function AttachmentList() {
 
       <ul className="flex flex-col">
         {attachments.length === 0 && (
-          <p className="text-[14px] text-neutral-400">No attachments.</p>
+          <p className="text-[14px] text-muted">No attachments.</p>
         )}
         {attachments.map((att) => (
           <AttachmentRow

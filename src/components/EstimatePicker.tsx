@@ -24,8 +24,8 @@ export function EstimatePicker({ value, onChange, revealed }: EstimatePickerProp
         onClick={() => setOpen((o) => !o)}
         className={
           value != null
-            ? "block w-11 rounded-md bg-indigo-50 px-1.5 py-0.5 text-center text-[11px] font-medium tabular-nums text-indigo-600 hover:bg-indigo-100"
-            : "block w-11 rounded-md px-1.5 py-0.5 text-center text-[11px] text-neutral-400 hover:bg-neutral-100 " +
+            ? "block w-11 rounded-md px-1.5 py-0.5 text-center text-[12px] tabular-nums text-muted hover:bg-accent-faint hover:text-text"
+            : "block w-11 rounded-md px-1.5 py-0.5 text-center text-[12px] text-muted hover:bg-accent-faint " +
               (revealed || open ? "opacity-100" : "opacity-0")
         }
       >
@@ -35,12 +35,12 @@ export function EstimatePicker({ value, onChange, revealed }: EstimatePickerProp
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 z-20 mt-1 w-28 rounded-md border border-neutral-200 bg-white p-1 shadow-lg">
+          <div className="absolute right-0 z-20 mt-1 w-28 rounded-md border border-hairline bg-surface-raised p-1 shadow-lg">
             {PRESETS.map((m) => (
               <button
                 key={m}
                 onClick={() => pick(m)}
-                className="block w-full rounded px-2 py-1 text-left text-[11px] tabular-nums text-neutral-700 hover:bg-neutral-100"
+                className="block w-full rounded px-2 py-1 text-left text-[12px] tabular-nums text-text hover:bg-accent-faint"
               >
                 {formatDuration(m)}
               </button>
@@ -48,7 +48,7 @@ export function EstimatePicker({ value, onChange, revealed }: EstimatePickerProp
             {value != null && (
               <button
                 onClick={() => pick(null)}
-                className="mt-1 block w-full rounded border-t border-neutral-100 px-2 py-1 text-left text-[11px] text-neutral-400 hover:bg-neutral-100"
+                className="mt-1 block w-full rounded border-t border-soft px-2 py-1 text-left text-[12px] text-muted hover:bg-accent-faint"
               >
                 Clear
               </button>

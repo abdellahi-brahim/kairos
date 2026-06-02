@@ -48,6 +48,6 @@ export function BlockCard({
 // overlay and the resting block stay in lockstep when colors change.
 export function blockSurfaceClass(done: boolean): string {
   return done
-    ? "border-neutral-200 bg-neutral-100 text-neutral-400"
-    : "border-indigo-200 bg-indigo-50 text-indigo-900";
+    ? "border-soft bg-soft text-muted"
+    : "border-accent/30 bg-accent-soft text-accent-strong";
 }

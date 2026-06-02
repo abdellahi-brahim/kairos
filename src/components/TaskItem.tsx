@@ -5,9 +5,10 @@ import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
-import { parseTags, tagColor } from "../lib/tags";
+import { parseTags } from "../lib/tags";
 import { htmlToPlainText } from "../lib/text";
 import { Checkbox } from "./Checkbox";
+import { TagChip } from "./TagChip";
 import { useInsertion } from "./InsertionContext";
 
 // A dense, title-first task row shared by every column (Inbox + day columns).
@@ -47,7 +48,7 @@ export function TaskItem({
   const [hovered, setHovered] = useState(false);
 
   // Within-column reorder marker: if this row is the insertion target, draw a
-  // 2px indigo line on the relevant edge. Provided by PlannerShell's DndContext.
+  // 2px accent line on the relevant edge. Provided by PlannerShell's DndContext.
   const insertion = useInsertion();
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
@@ -68,21 +69,26 @@ export function TaskItem({
   // render the snippet only when there is actual text after stripping.
   const snippet = htmlToPlainText(task.notes);
 
-  // Whether any footer metadata exists. Keeps the row to a single line when a
-  // task is bare (the common Inbox case), preserving vertical density.
-  const hasMeta =
-    !!task.scheduled_start ||
+  // Resting footer shows AT MOST two quiet items (scheduled time + first tag,
+  // or a running dot). Everything else (estimate, tracked, subtasks,
+  // attachments, extra tags) is revealed on hover, keeping the card serene at
+  // rest. `hasRestMeta` controls whether the resting footer row exists at all.
+  const restTag = tags[0];
+  const hasRestMeta = !!task.scheduled_start || running || !!restTag;
+  // Extra metadata only worth showing once the card is hovered.
+  const hasHoverExtra =
     task.estimate_minutes != null ||
-    tags.length > 0 ||
-    running ||
     task.actual_minutes > 0 ||
     (!!task.subtask_total && task.subtask_total > 0) ||
-    (!!task.attachment_count && task.attachment_count > 0);
+    (!!task.attachment_count && task.attachment_count > 0) ||
+    tags.length > 1;
+  const showFooter = hasRestMeta || (hovered && hasHoverExtra);
 
   // Priority left rail: a 2px colored left border. border-left-color is more
   // specific than the hover's generic border-color swap, so the rail color stays
-  // stable across hover (only the other sides + shadow emphasize). When priority
-  // is 0 there is no rail and the plain hairline left border applies.
+  // stable across hover. No rail for priority 0. At rest the card has NO border;
+  // hover brings the hairline + soft shadow in (single hover signal). The rail
+  // is the one resting border, so a prioritized card still reads as a unit.
   const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
 
   return (
@@ -92,21 +98,22 @@ export function TaskItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        // Every card carries a visible border + white surface + padding so
-        // cards read as distinct units; hover just emphasizes. relative so the
-        // insertion line can be absolutely positioned to span the row.
-        "relative rounded-md border bg-white px-2 py-1.5 " +
-        (hovered ? "border-neutral-300 shadow-sm" : "border-neutral-200") +
+        // At rest: surface + spacing define the card, no border (REMOVAL). Hover
+        // brings in a hairline + soft shadow (the single hover signal). relative
+        // so the insertion line can span the row. border-transparent at rest
+        // keeps the box metrics identical so hover never shifts layout.
+        "relative rounded-md border bg-surface-raised px-3 py-2 transition-shadow duration-150 ease-out " +
+        (hovered ? "border-hairline shadow-sm" : "border-transparent") +
         railClass
       }
     >
-      {/* Within-column reorder insertion line: a 2px indigo bar on the edge the
+      {/* Within-column reorder insertion line: a 2px accent bar on the edge the
           dragged row will land against. Tied to the active drag (cleared on
           drag end/cancel), so it never lingers after drop. */}
       {insertion && insertion.taskId === task.id && (
         <span
           className={
-            "pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded-full bg-indigo-500 " +
+            "pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded-full bg-accent " +
             (insertion.edge === "above" ? "-top-0.5" : "-bottom-0.5")
           }
         />
@@ -115,7 +122,7 @@ export function TaskItem({
           up to 3 lines. Controls top-align so they sit on the first title line
           when it wraps. The h-5 wrappers keep them vertically centered on a
           single-line title, preserving the dense one-row look for bare tasks. */}
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-start gap-2">
         <button
           {...attributes}
           {...listeners}
@@ -123,8 +130,8 @@ export function TaskItem({
           className={
             // Faint at rest so it reads as a quiet hint without competing with
             // the title; fully visible on hover.
-            "flex h-5 shrink-0 cursor-grab items-center text-[11px] leading-none text-neutral-300 transition-opacity " +
-            (hovered ? "opacity-100" : "opacity-30")
+            "flex h-5 shrink-0 cursor-grab items-center text-[11px] leading-none text-faint transition-opacity " +
+            (hovered ? "opacity-100" : "opacity-0")
           }
         >
           ⠿
@@ -147,8 +154,8 @@ export function TaskItem({
           onClick={open}
           title={task.title}
           className={
-            "min-w-0 flex-1 line-clamp-3 text-left text-[13px] font-medium leading-5 " +
-            (done ? "text-neutral-400 line-through" : "text-neutral-800")
+            "min-w-0 flex-1 line-clamp-3 text-left text-[14px] font-medium leading-5 " +
+            (done ? "text-muted line-through" : "text-text")
           }
         >
           {task.title}
@@ -161,7 +168,7 @@ export function TaskItem({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => openFocus(task.id)}
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-neutral-400 hover:bg-indigo-50 hover:text-indigo-600 " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-muted hover:bg-accent-soft hover:text-accent " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
@@ -172,7 +179,7 @@ export function TaskItem({
           aria-label="Delete task"
           onClick={() => removeTask(task.id)}
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-neutral-400 hover:bg-red-50 hover:text-red-500 " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-muted hover:bg-alert-soft hover:text-alert " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
@@ -184,72 +191,76 @@ export function TaskItem({
           task has notes. Indented to align under the title. Rich-text HTML is
           stripped to text (never rendered raw) by htmlToPlainText. */}
       {snippet && (
-        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[11px] leading-snug text-neutral-400">
+        <p className="line-clamp-2 pl-7 pt-1 text-[12px] leading-snug text-muted">
           {snippet}
         </p>
       )}
 
-      {/* Footer: compact, muted metadata. Indented to align under the title,
-          shrinks/wraps rather than crowding the title above it. */}
-      {hasMeta && (
-        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[11px] leading-none text-neutral-400">
+      {/* Footer: at REST shows at most two quiet items (scheduled time + first
+          tag, or a running dot). Hover reveals the rest (estimate, tracked,
+          subtasks, attachments, extra tags) so the resting card stays serene.
+          Indented to align under the title. */}
+      {showFooter && (
+        <div className="flex flex-wrap items-center gap-2 pl-7 pt-1 text-[12px] leading-none text-muted">
           {task.scheduled_start && (
-            <span className="tabular-nums text-neutral-500">
+            <span className="tabular-nums text-muted">
               {task.scheduled_start}
             </span>
-          )}
-          {task.estimate_minutes != null && (
-            <button
-              onClick={open}
-              title="Estimate"
-              className="rounded bg-indigo-50 px-1 py-0.5 font-medium tabular-nums text-indigo-600"
-            >
-              {formatDuration(task.estimate_minutes)}
-            </button>
-          )}
-          {task.actual_minutes > 0 && (
-            <button
-              onClick={open}
-              title="Tracked time"
-              className="rounded bg-emerald-50 px-1 py-0.5 font-medium tabular-nums text-emerald-600"
-            >
-              {formatDuration(task.actual_minutes)}
-            </button>
           )}
           {running && (
             <span
               title="Timer running"
-              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
             />
           )}
-          {!!task.subtask_total && task.subtask_total > 0 && (
-            <button
-              onClick={open}
-              title="Subtasks"
-              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
-            >
-              ☑ {task.subtask_done ?? 0}/{task.subtask_total}
-            </button>
+          {/* First tag rests; remaining tags reveal on hover. */}
+          {restTag && <TagChip name={restTag} onClick={open} />}
+
+          {/* Hover-revealed extras: kept mounted only when hovered so resting
+              clicks never hit them, yet they appear with the card's hover. */}
+          {hovered && (
+            <>
+              {task.estimate_minutes != null && (
+                <button
+                  onClick={open}
+                  title="Estimate"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  {formatDuration(task.estimate_minutes)}
+                </button>
+              )}
+              {task.actual_minutes > 0 && (
+                <button
+                  onClick={open}
+                  title="Tracked time"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  {formatDuration(task.actual_minutes)} tracked
+                </button>
+              )}
+              {!!task.subtask_total && task.subtask_total > 0 && (
+                <button
+                  onClick={open}
+                  title="Subtasks"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+                </button>
+              )}
+              {!!task.attachment_count && task.attachment_count > 0 && (
+                <button
+                  onClick={open}
+                  title="Attachments"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  📎 {task.attachment_count}
+                </button>
+              )}
+              {tags.slice(1).map((t) => (
+                <TagChip key={t} name={t} onClick={open} />
+              ))}
+            </>
           )}
-          {!!task.attachment_count && task.attachment_count > 0 && (
-            <button
-              onClick={open}
-              title="Attachments"
-              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
-            >
-              📎 {task.attachment_count}
-            </button>
-          )}
-          {tags.slice(0, 2).map((t) => (
-            <button
-              key={t}
-              onClick={open}
-              className={"rounded px-1 py-0.5 font-medium " + tagColor(t)}
-            >
-              {t}
-            </button>
-          ))}
-          {tags.length > 2 && <span>+{tags.length - 2}</span>}
         </div>
       )}
     </li>

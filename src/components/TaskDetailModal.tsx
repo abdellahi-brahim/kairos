@@ -10,25 +10,20 @@ import { PriorityPicker } from "./PriorityPicker";
 import { TagEditor } from "./TagEditor";
 import { Checkbox } from "./Checkbox";
 
-// Inline metadata field: an 11px muted label next to its control. Matches the
-// dense footer scale on the cards.
+// Inline metadata field: a 12px muted label next to its control.
 function Meta({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[11px] text-neutral-400">{label}</span>
+      <span className="text-[12px] text-muted">{label}</span>
       {children}
     </div>
   );
 }
 
-// Section heading ("Description", "Subtasks", "Comments"): 11px muted semibold
-// uppercase, matching the column section labels.
+// Section heading ("Description", "Subtasks", "Comments"): 12px muted medium,
+// sentence case (no more uppercase micro-caps).
 function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
-      {children}
-    </h3>
-  );
+  return <h3 className="text-[12px] font-medium text-muted">{children}</h3>;
 }
 
 export function TaskDetailModal({ taskId }: { taskId: number }) {
@@ -94,11 +89,11 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
       onClick={doClose}
     >
       <div
-        className="mt-6 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl"
+        className="mt-6 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface-raised shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start gap-2 border-b border-neutral-200 px-4 py-2.5">
+        <div className="flex items-start gap-2 border-b border-soft px-4 py-2.5">
           <span className="flex h-[26px] shrink-0 items-center">
             <Checkbox checked={done} onChange={() => toggleComplete(task)} />
           </span>
@@ -111,7 +106,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             }}
             className={
               "flex-1 text-[18px] font-semibold leading-relaxed outline-none " +
-              (done ? "text-neutral-400 line-through" : "text-neutral-800")
+              (done ? "text-muted line-through" : "text-text")
             }
           />
           <button
@@ -120,14 +115,14 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
               close();
             }}
             title="Focus on this task"
-            className="mt-0.5 shrink-0 rounded bg-indigo-500 px-2 py-1 text-[11px] font-medium leading-none text-white hover:bg-indigo-600"
+            className="mt-0.5 shrink-0 rounded bg-accent px-2 py-1 text-[11px] font-medium leading-none text-white hover:bg-accent-strong"
           >
             ◎ Focus
           </button>
           <button
             onClick={doClose}
             aria-label="Close"
-            className="mt-0.5 shrink-0 rounded p-1 text-[11px] leading-none text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+            className="mt-0.5 shrink-0 rounded p-1 text-[11px] leading-none text-muted hover:bg-accent-faint hover:text-text"
           >
             ✕
           </button>
@@ -155,7 +150,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             </Meta>
             {task.scheduled_start && (
               <Meta label="Scheduled">
-                <span className="text-[11px] tabular-nums text-neutral-700">
+                <span className="text-[12px] tabular-nums text-text">
                   {task.scheduled_start}
                 </span>
               </Meta>
@@ -169,7 +164,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
           </div>
 
           {/* Description */}
-          <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-neutral-400">
+          <label className="mb-1 block text-[12px] font-medium text-muted">
             Description
           </label>
           <RichTextEditor
@@ -193,25 +188,22 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             <SectionLabel>Comments</SectionLabel>
             <ul className="mt-2 flex flex-col gap-1.5">
               {comments.length === 0 && (
-                <p className="text-[14px] text-neutral-400">No comments yet.</p>
+                <p className="text-[14px] text-muted">No comments yet.</p>
               )}
               {comments.map((c) => (
-                <li
-                  key={c.id}
-                  className="rounded-md bg-neutral-50 p-2 text-[14px]"
-                >
+                <li key={c.id} className="rounded-md bg-surface p-2 text-[14px]">
                   <div className="mb-0.5 flex items-center justify-between">
-                    <span className="text-[10px] text-neutral-400">
+                    <span className="text-[10px] text-muted">
                       {formatDateTime(c.created_at)}
                     </span>
                     <button
                       onClick={() => deleteComment(c.id)}
-                      className="text-[10px] text-neutral-300 hover:text-red-500"
+                      className="text-[10px] text-faint hover:text-alert"
                     >
                       delete
                     </button>
                   </div>
-                  <p className="whitespace-pre-wrap text-neutral-700">{c.body}</p>
+                  <p className="whitespace-pre-wrap text-text">{c.body}</p>
                 </li>
               ))}
             </ul>
@@ -227,11 +219,11 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
                 }}
                 placeholder="Write a comment… (⌘/Ctrl+Enter)"
                 rows={2}
-                className="flex-1 resize-y rounded-md border border-neutral-200 p-2 text-[14px] outline-none focus:border-neutral-300"
+                className="flex-1 resize-y rounded-md border border-hairline p-2 text-[14px] outline-none focus:border-accent"
               />
               <button
                 onClick={submitComment}
-                className="self-end rounded-md bg-indigo-500 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-indigo-600"
+                className="self-end rounded-md bg-accent px-3 py-1.5 text-[11px] font-medium text-white hover:bg-accent-strong"
               >
                 Add
               </button>
@@ -240,19 +232,19 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
         </div>
 
         {/* Footer */}
-        <div className="flex justify-between border-t border-neutral-200 px-3 py-2">
+        <div className="flex justify-between border-t border-soft px-3 py-2">
           <button
             onClick={() => {
               removeTask(task.id);
               close();
             }}
-            className="text-[11px] text-red-500 hover:underline"
+            className="text-[11px] text-alert hover:underline"
           >
             Delete task
           </button>
           <button
             onClick={doClose}
-            className="rounded-md bg-neutral-100 px-3 py-1.5 text-[11px] text-neutral-700 hover:bg-neutral-200"
+            className="rounded-md bg-soft px-3 py-1.5 text-[11px] text-text hover:bg-hairline"
           >
             Close
           </button>

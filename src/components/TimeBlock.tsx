@@ -127,7 +127,7 @@ export function TimeBlock({ task }: { task: Task }) {
         // document-wide by the global drag-cursor manager, because WKWebView
         // will not repaint this element's cursor once the pointer is pressed.
         "absolute left-14 right-2 cursor-grab touch-none select-none overflow-hidden rounded-md border px-2 py-1 text-left shadow-sm " +
-        (handleHover ? "ring-1 ring-indigo-300 " : "") +
+        (handleHover ? "ring-1 ring-accent/40 " : "") +
         blockSurfaceClass(done)
       }
     >
@@ -146,7 +146,7 @@ export function TimeBlock({ task }: { task: Task }) {
                 openFocus(task.id);
               }}
               className={
-                "text-[10px] text-indigo-400 hover:text-indigo-700 " +
+                "text-[10px] text-accent/70 hover:text-accent-strong " +
                 (hovered ? "opacity-100" : "opacity-0")
               }
             >
@@ -160,7 +160,7 @@ export function TimeBlock({ task }: { task: Task }) {
                 unschedule(task.id);
               }}
               className={
-                "text-[10px] text-indigo-400 hover:text-indigo-700 " +
+                "text-[10px] text-accent/70 hover:text-accent-strong " +
                 (hovered ? "opacity-100" : "opacity-0")
               }
             >
@@ -183,7 +183,7 @@ export function TimeBlock({ task }: { task: Task }) {
           <div
             className={
               "h-1 w-6 rounded-full transition-colors " +
-              (handleHover ? "bg-indigo-500" : "bg-indigo-300")
+              (handleHover ? "bg-accent" : "bg-accent/50")
             }
           />
         )}

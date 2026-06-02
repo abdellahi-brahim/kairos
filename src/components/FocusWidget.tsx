@@ -75,7 +75,7 @@ export function FocusWidget() {
     const totalSec = Math.ceil(remainMs / 1000);
     timerClock = `${pad(Math.floor(totalSec / 60))}:${pad(totalSec % 60)}`;
     phaseLabel = pomoIsWork ? "Focus" : "Break";
-    clockClass = pomoIsWork ? "text-indigo-200" : "text-emerald-200";
+    clockClass = pomoIsWork ? "text-focus-accent" : "text-neutral-300";
   } else if (hasTask && state?.running && state.timerStartedAt) {
     const elapsedSec = Math.max(
       0,
@@ -87,17 +87,17 @@ export function FocusWidget() {
     timerClock =
       h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${pad(m)}:${pad(sec)}`;
     phaseLabel = "Session";
-    clockClass = "text-emerald-200";
+    clockClass = "text-focus-accent";
   }
 
-  // Status dot color: indigo while working, emerald on break, neutral idle.
+  // Status dot color: accent while working/session, calm neutral on break, idle.
   const dotClass = !hasTask
     ? "bg-neutral-600"
     : pomoActive
       ? pomoIsWork
-        ? "bg-indigo-400"
-        : "bg-emerald-400"
-      : "bg-emerald-400";
+        ? "bg-focus-accent"
+        : "bg-neutral-500"
+      : "bg-focus-accent";
 
   // Quiet icon button. Controls explicitly opt OUT of the drag region so clicks
   // land instead of starting a window drag.
@@ -119,7 +119,7 @@ export function FocusWidget() {
         data-tauri-drag-region
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="flex w-full flex-col justify-between rounded-2xl border border-white/10 bg-neutral-900 px-3.5 py-2.5 text-neutral-100 shadow-[0_8px_30px_rgba(0,0,0,0.55)]"
+        className="flex w-full flex-col justify-between rounded-2xl border border-white/10 bg-focus-bg px-3.5 py-2.5 text-neutral-100 shadow-[0_8px_30px_rgba(0,0,0,0.55)]"
       >
         {/* Top line: status dot + task title (truncated) + close on hover. */}
         <div
@@ -169,9 +169,9 @@ export function FocusWidget() {
                   "text-[10px] font-medium tracking-wide uppercase " +
                   (pomoActive
                     ? pomoIsWork
-                      ? "text-indigo-400/80"
-                      : "text-emerald-400/80"
-                    : "text-emerald-400/70")
+                      ? "text-focus-accent/80"
+                      : "text-neutral-400/80"
+                    : "text-focus-accent/70")
                 }
               >
                 {phaseLabel}
@@ -197,7 +197,7 @@ export function FocusWidget() {
           {hasTask && (
             <button
               onClick={() => sendIntent({ type: "complete" })}
-              className="shrink-0 rounded-lg bg-indigo-500 px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-indigo-400"
+              className="shrink-0 rounded-lg bg-accent px-3 py-1.5 text-[11px] font-semibold text-white shadow-sm transition hover:bg-accent-strong"
             >
               Done
             </button>

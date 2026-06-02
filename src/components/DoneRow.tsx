@@ -3,9 +3,10 @@ import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
-import { parseTags, tagColor } from "../lib/tags";
+import { parseTags } from "../lib/tags";
 import { htmlToPlainText } from "../lib/text";
 import { Checkbox } from "./Checkbox";
+import { TagChip } from "./TagChip";
 
 // A dense, read-only row for a column's collapsed "Done" group. Visually mirrors
 // TaskItem's done state but deliberately does NOT register a dnd sortable: done
@@ -31,25 +32,27 @@ export function DoneRow({ task }: { task: Task }) {
   // more specific than the hover border-color swap, so the rail survives hover.
   const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
 
-  const hasMeta =
+  const restTag = tags[0];
+  const hasRestMeta = running || !!restTag;
+  const hasHoverExtra =
     task.estimate_minutes != null ||
-    tags.length > 0 ||
-    running ||
     task.actual_minutes > 0 ||
     (!!task.subtask_total && task.subtask_total > 0) ||
-    (!!task.attachment_count && task.attachment_count > 0);
+    (!!task.attachment_count && task.attachment_count > 0) ||
+    tags.length > 1;
+  const showFooter = hasRestMeta || (hovered && hasHoverExtra);
 
   return (
     <li
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        "rounded-md border bg-white px-2 py-1.5 " +
-        (hovered ? "border-neutral-300 shadow-sm" : "border-neutral-200") +
+        "rounded-md border bg-surface-raised px-3 py-2 transition-shadow duration-150 ease-out " +
+        (hovered ? "border-hairline shadow-sm" : "border-transparent") +
         railClass
       }
     >
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-start gap-2">
         <span className="flex h-5 shrink-0 items-center">
           <Checkbox checked onChange={() => toggleComplete(task)} />
         </span>
@@ -57,7 +60,7 @@ export function DoneRow({ task }: { task: Task }) {
         <button
           onClick={open}
           title={task.title}
-          className="min-w-0 flex-1 line-clamp-3 text-left text-[13px] font-medium leading-5 text-neutral-400 line-through"
+          className="min-w-0 flex-1 line-clamp-3 text-left text-[14px] font-medium leading-5 text-muted line-through"
         >
           {task.title}
         </button>
@@ -66,7 +69,7 @@ export function DoneRow({ task }: { task: Task }) {
           aria-label="Delete task"
           onClick={() => removeTask(task.id)}
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-neutral-400 hover:bg-red-50 hover:text-red-500 " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-muted hover:bg-alert-soft hover:text-alert " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
@@ -75,65 +78,64 @@ export function DoneRow({ task }: { task: Task }) {
       </div>
 
       {snippet && (
-        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[11px] leading-snug text-neutral-400">
+        <p className="line-clamp-2 pl-7 pt-1 text-[12px] leading-snug text-muted">
           {snippet}
         </p>
       )}
 
-      {hasMeta && (
-        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[11px] leading-none text-neutral-400">
-          {task.estimate_minutes != null && (
-            <button
-              onClick={open}
-              title="Estimate"
-              className="rounded bg-indigo-50 px-1 py-0.5 font-medium tabular-nums text-indigo-600"
-            >
-              {formatDuration(task.estimate_minutes)}
-            </button>
-          )}
-          {task.actual_minutes > 0 && (
-            <button
-              onClick={open}
-              title="Tracked time"
-              className="rounded bg-emerald-50 px-1 py-0.5 font-medium tabular-nums text-emerald-600"
-            >
-              {formatDuration(task.actual_minutes)}
-            </button>
-          )}
+      {showFooter && (
+        <div className="flex flex-wrap items-center gap-2 pl-7 pt-1 text-[12px] leading-none text-muted">
           {running && (
             <span
               title="Timer running"
-              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
             />
           )}
-          {!!task.subtask_total && task.subtask_total > 0 && (
-            <button
-              onClick={open}
-              title="Subtasks"
-              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
-            >
-              ☑ {task.subtask_done ?? 0}/{task.subtask_total}
-            </button>
+          {restTag && <TagChip name={restTag} onClick={open} />}
+
+          {hovered && (
+            <>
+              {task.estimate_minutes != null && (
+                <button
+                  onClick={open}
+                  title="Estimate"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  {formatDuration(task.estimate_minutes)}
+                </button>
+              )}
+              {task.actual_minutes > 0 && (
+                <button
+                  onClick={open}
+                  title="Tracked time"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  {formatDuration(task.actual_minutes)} tracked
+                </button>
+              )}
+              {!!task.subtask_total && task.subtask_total > 0 && (
+                <button
+                  onClick={open}
+                  title="Subtasks"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+                </button>
+              )}
+              {!!task.attachment_count && task.attachment_count > 0 && (
+                <button
+                  onClick={open}
+                  title="Attachments"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  📎 {task.attachment_count}
+                </button>
+              )}
+              {tags.slice(1).map((t) => (
+                <TagChip key={t} name={t} onClick={open} />
+              ))}
+            </>
           )}
-          {!!task.attachment_count && task.attachment_count > 0 && (
-            <button
-              onClick={open}
-              title="Attachments"
-              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
-            >
-              📎 {task.attachment_count}
-            </button>
-          )}
-          {tags.slice(0, 2).map((t) => (
-            <button
-              key={t}
-              onClick={open}
-              className={"rounded px-1 py-0.5 font-medium " + tagColor(t)}
-            >
-              {t}
-            </button>
-          ))}
-          {tags.length > 2 && <span>+{tags.length - 2}</span>}
         </div>
       )}
     </li>

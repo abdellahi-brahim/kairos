@@ -15,30 +15,33 @@ export function OverdueBand() {
   if (carryOver.length === 0) return null;
 
   return (
-    <div className="mb-1.5 rounded-md border border-rose-200 border-l-2 border-l-rose-400 bg-rose-50/40">
-      <div className="flex items-center justify-between gap-1 px-1.5 py-1">
+    // Softened: one alert left-rail + a faint alert tint, no full bordered card
+    // (REMOVAL of the two-border rose box). The label is sentence case and
+    // muted-alert, not a loud uppercase header.
+    <div className="mb-2 rounded-md border-l-2 border-l-alert bg-alert-soft/50">
+      <div className="flex items-center justify-between gap-1 px-2 py-1.5">
         <button
           onClick={() => setExpanded((v) => !v)}
           className="flex min-w-0 items-center gap-1 text-left"
         >
-          <span className="text-[10px] leading-none text-rose-400">
+          <span className="text-[11px] leading-none text-alert">
             {expanded ? "▾" : "▸"}
           </span>
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-rose-500">
+          <span className="text-[12px] font-medium text-alert">
             Overdue ({carryOver.length})
           </span>
         </button>
         <button
           onClick={() => moveAllToToday(carryOver.map((t) => t.id))}
           title="Move all overdue tasks to today"
-          className="shrink-0 rounded border border-rose-200 bg-white px-1 py-0.5 text-[10px] font-medium text-rose-500 hover:bg-rose-50 hover:text-rose-600"
+          className="shrink-0 rounded px-1.5 py-0.5 text-[12px] font-medium text-alert hover:bg-alert-soft"
         >
           Move all to today
         </button>
       </div>
 
       {expanded && (
-        <ul className="flex flex-col gap-1 px-1.5 pb-1.5">
+        <ul className="flex flex-col gap-2 px-2 pb-2">
           {carryOver.map((task) => (
             <OverdueRow key={task.id} task={task} />
           ))}

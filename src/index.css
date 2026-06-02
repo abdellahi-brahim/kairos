@@ -1,5 +1,44 @@
 @import "tailwindcss";
 
+/* Calm-pass design tokens. ONE accent (a calm desaturated slate/ink-blue, not
+   Tailwind indigo) + warm neutrals + one alert. Exposed as Tailwind utilities
+   through @theme so components use bg-surface / text-muted / border-hairline /
+   text-accent / bg-accent instead of raw neutral-* / indigo-* classes. This is a
+   design branch: the hexes are easy to tweak in one place after a visual pass. */
+@theme {
+  /* Warm-paper surfaces */
+  --color-surface: #faf9f7; /* shell background, warm off-white */
+  --color-surface-raised: #ffffff; /* cards, panels */
+
+  /* Warm near-neutral ink. Note: Tailwind v4 derives the utility name from the
+     token name after --color-, so --color-muted -> text-muted/bg-muted and
+     --color-faint -> text-faint. (A --color-text-muted would become the awkward
+     text-text-muted.) --color-text stays as primary -> text-text. */
+  --color-text: #33312e; /* primary text */
+  --color-muted: #7a746c; /* secondary / meta */
+  --color-faint: #a8a29a; /* hints, placeholders, drag handle */
+
+  /* Hairlines + dividers */
+  --color-hairline: #e7e3dd; /* card/panel border */
+  --color-soft: #f0ede8; /* dividers, gridlines */
+
+  /* THE one accent: a calm, slightly-desaturated ink-blue/slate */
+  --color-accent: #4c5b6e;
+  --color-accent-strong: #3d4a5a; /* hover/pressed */
+  --color-accent-soft: #eef1f4; /* tint backgrounds, selection wash */
+  --color-accent-faint: #f5f7f9; /* very light hover wash */
+
+  /* One alert, used ONLY for overdue: a soft terracotta/rose */
+  --color-alert: #b06a56;
+  --color-alert-soft: #f6edea;
+
+  /* Dark focus surfaces (Zen / FocusWidget) share the same accent family. The
+     dark side reads the lighter tints of the accent so light + dark feel like
+     one product. */
+  --color-focus-bg: #1c1b1a; /* warm near-black, matches the warm light side */
+  --color-focus-accent: #93a6bd; /* the accent, lightened for dark contrast */
+}
+
 :root {
   color-scheme: light;
 }
@@ -26,12 +65,14 @@ body {
     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial,
     sans-serif;
   -webkit-font-smoothing: antialiased;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* Rich-text editor content (TipTap). Tailwind's reset removes these defaults. */
 .rt-content {
   font-size: 0.875rem;
-  color: #374151;
+  color: var(--color-text);
   min-height: 4rem;
 }
 .rt-content p {
@@ -85,22 +126,22 @@ body {
 .rt-content-zen {
   font-size: 1.0625rem;
   line-height: 1.6;
-  color: #e5e7eb;
+  color: #e6e3df;
 }
 .rt-content-zen h1,
 .rt-content-zen h2 {
-  color: #f3f4f6;
+  color: #f4f2ef;
 }
 .rt-content-zen code {
-  background: #262626;
-  color: #e5e7eb;
+  background: #2b2927;
+  color: #e6e3df;
 }
 .rt-content-zen pre {
-  background: #262626;
+  background: #2b2927;
 }
 .rt-content-zen blockquote {
-  border-left-color: #404040;
-  color: #9ca3af;
+  border-left-color: #45413d;
+  color: #a8a29a;
 }
 
 /* Placeholder text for the empty editor */

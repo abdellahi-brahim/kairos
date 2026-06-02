@@ -19,8 +19,8 @@ export function NowLine() {
       className="pointer-events-none absolute left-12 right-2 z-20 flex items-center"
       style={{ top: topForMinutes(minutes, win) }}
     >
-      <div className="-ml-1 h-2 w-2 rounded-full bg-red-500" />
-      <div className="h-px flex-1 bg-red-500" />
+      <div className="-ml-1 h-2 w-2 rounded-full bg-accent" />
+      <div className="h-px flex-1 bg-accent" />
     </div>
   );
 }

@@ -90,42 +90,42 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
     <div
       data-day={date}
       className={
-        // A 2px top border on every column keeps content alignment identical
-        // across columns; only the selected one colors it indigo so it visually
-        // connects up to the timeline panel on the right.
-        "flex w-60 shrink-0 flex-col border-r border-t-2 border-neutral-200 " +
-        (isSelected
-          ? "border-t-indigo-500 bg-indigo-50/30"
-          : "border-t-transparent")
+        // ONE selection signal: a 2px accent left rail on the selected column.
+        // No bg tint, no header ring, no top border (REMOVAL of the old
+        // 4-signal stack). Soft right divider between columns. A transparent
+        // left border on unselected columns keeps content alignment identical.
+        "flex w-60 shrink-0 flex-col border-r border-soft border-l-2 " +
+        (isSelected ? "border-l-accent" : "border-l-transparent")
       }
     >
       <button
         onClick={() => setDate(date)}
         title="Select this day for the timeline"
         className={
-          "flex items-baseline justify-between gap-2 border-b px-2 py-1 text-left " +
+          "flex items-baseline justify-between gap-2 border-b border-soft px-2 py-1.5 text-left " +
           (isSelected
-            ? "border-indigo-300 bg-indigo-100/70 ring-1 ring-inset ring-indigo-300"
+            ? "bg-surface-raised"
             : isToday
-              ? "border-indigo-200 bg-indigo-50/60 hover:bg-indigo-50"
-              : "border-neutral-200 bg-white hover:bg-neutral-50")
+              ? "bg-surface-raised hover:bg-accent-faint"
+              : "bg-surface hover:bg-accent-faint")
         }
       >
-        <span className="flex items-baseline gap-1">
-          <span className="text-[13px] font-semibold text-neutral-800">
+        <span className="flex items-baseline gap-1.5">
+          <span
+            className={
+              "text-[13px] font-semibold " +
+              (isSelected ? "text-accent" : "text-text")
+            }
+          >
             {weekdayShort(date)}
           </span>
-          <span className="text-[13px] text-neutral-500">
-            {dayOfMonth(date)}
-          </span>
+          <span className="text-[13px] text-muted">{dayOfMonth(date)}</span>
           {isToday && (
-            <span className="rounded bg-indigo-500 px-1 py-px text-[10px] font-medium uppercase tracking-wide text-white">
-              Today
-            </span>
+            <span className="text-[12px] font-medium text-accent">Today</span>
           )}
         </span>
         {plannedMinutes > 0 && (
-          <span className="text-[10px] tabular-nums text-neutral-400">
+          <span className="text-[12px] tabular-nums text-muted">
             {formatDuration(plannedMinutes)}
           </span>
         )}
@@ -134,26 +134,26 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
       <div
         ref={setNodeRef}
         className={
-          "flex flex-1 flex-col overflow-y-auto px-1.5 py-1.5 " +
-          (isOver ? "bg-indigo-50/60" : "")
+          "flex flex-1 flex-col overflow-y-auto px-1.5 py-2 " +
+          (isOver ? "bg-accent-soft/60" : "")
         }
       >
         {isToday && <OverdueBand />}
 
-        <div className="mb-0.5 flex items-baseline justify-between px-1">
-          <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+        <div className="mb-1 flex items-baseline justify-between px-1">
+          <span className="text-[12px] font-medium text-muted">
             {open.length} open
           </span>
         </div>
 
         {open.length === 0 ? (
-          <p className="px-1 py-1.5 text-[11px] text-neutral-300">No tasks.</p>
+          <p className="px-1 py-1.5 text-[12px] text-faint">No tasks.</p>
         ) : (
           <SortableContext
             items={open.map((t) => t.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-2">
               {open.map((task) => {
                 const isLeaving = leaving.has(task.id);
                 return (
@@ -185,20 +185,20 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
         )}
 
         {done.length > 0 && (
-          <div className="mt-1.5">
+          <div className="mt-2">
             <button
               onClick={() => setDoneOpen((v) => !v)}
               className="flex w-full items-center gap-1 px-1 py-0.5 text-left"
             >
-              <span className="text-[10px] leading-none text-neutral-400">
+              <span className="text-[11px] leading-none text-muted">
                 {doneOpen ? "▾" : "▸"}
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
+              <span className="text-[12px] font-medium text-muted">
                 Done ({done.length})
               </span>
             </button>
             {doneOpen && (
-              <ul className="mt-1 flex flex-col gap-1">
+              <ul className="mt-1 flex flex-col gap-2">
                 {done.map((task) => (
                   <DoneRow key={task.id} task={task} />
                 ))}

@@ -33,10 +33,10 @@ export function Checkbox({
       className={
         "flex h-4 w-4 shrink-0 cursor-pointer items-center justify-center rounded-full border transition-colors " +
         (checked
-          ? "border-indigo-500 bg-indigo-500"
+          ? "border-accent bg-accent"
           : hovered
-            ? "border-indigo-400 bg-transparent"
-            : "border-neutral-300 bg-transparent")
+            ? "border-accent bg-transparent"
+            : "border-hairline bg-transparent")
       }
     >
       <svg
@@ -50,7 +50,7 @@ export function Checkbox({
         style={{
           // Draw/fade in over ~120ms when checked. An empty box shows a faint
           // ghost check on hover as a click affordance.
-          color: checked ? "#ffffff" : "#a5b4fc",
+          color: checked ? "#ffffff" : "#4c5b6e",
           opacity: checked ? 1 : hovered ? 0.5 : 0,
           transform: checked ? "scale(1)" : "scale(0.6)",
           transition: "opacity 120ms ease, transform 120ms ease, color 120ms ease",

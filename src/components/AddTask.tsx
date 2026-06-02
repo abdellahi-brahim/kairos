@@ -24,7 +24,7 @@ export function AddTask({ placeholder, onAdd }: AddTaskProps) {
         if (e.key === "Escape") setValue("");
       }}
       placeholder={placeholder}
-      className="w-full rounded border border-transparent bg-neutral-100 px-2 py-1 text-[12px] text-neutral-800 placeholder-neutral-400 outline-none focus:border-neutral-300 focus:bg-white"
+      className="w-full rounded border border-transparent bg-soft px-2 py-1 text-[12px] text-text placeholder-faint outline-none focus:border-accent focus:bg-surface-raised"
     />
   );
 }

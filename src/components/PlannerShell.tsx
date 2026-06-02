@@ -170,11 +170,11 @@ function PanelSplitter({
         (side === "right" ? "-right-0.5" : "-left-0.5")
       }
     >
-      {/* Faint indigo line revealed on JS hover (CSS :hover sticks in WKWeb
+      {/* Faint accent line revealed on JS hover (CSS :hover sticks in WKWeb
           WebView after a drag), matching the timeline's hover affordances. */}
       <div
         className={
-          "h-full w-px bg-indigo-400 transition-opacity " +
+          "h-full w-px bg-accent transition-opacity " +
           (hovered ? "opacity-100" : "opacity-0")
         }
       />
@@ -201,11 +201,11 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
   if (collapsed) {
     // A thin rail; the chevron points right because the panel expands rightward.
     return (
-      <aside className="flex w-7 shrink-0 flex-col items-center border-r border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out">
+      <aside className="flex w-7 shrink-0 flex-col items-center border-r border-soft bg-surface transition-[width] duration-[180ms] ease-out">
         <button
           onClick={toggle}
           title="Expand inbox"
-          className="flex h-7 w-7 items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          className="flex h-7 w-7 items-center justify-center text-muted hover:bg-accent-faint hover:text-text"
         >
           ›
         </button>
@@ -220,16 +220,14 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
     // swap nodes and the animation would not run.
     <aside
       style={{ width, transition: resizing ? "none" : undefined }}
-      className="relative flex shrink-0 flex-col border-r border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out"
+      className="relative flex shrink-0 flex-col border-r border-soft bg-surface transition-[width] duration-[180ms] ease-out"
     >
-      <div className="flex items-center justify-between border-b border-neutral-200 px-2 py-1">
-        <h2 className="text-[10px] font-semibold uppercase tracking-wide text-neutral-400">
-          Inbox
-        </h2>
+      <div className="flex items-center justify-between border-b border-soft px-2 py-1.5">
+        <h2 className="text-[12px] font-medium text-muted">Inbox</h2>
         <button
           onClick={toggle}
           title="Collapse inbox"
-          className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-accent-faint hover:text-text"
         >
           ‹
         </button>
@@ -237,20 +235,18 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
       <div
         ref={setNodeRef}
         className={
-          "flex flex-1 flex-col overflow-y-auto px-1.5 py-1.5 " +
-          (isOver ? "bg-indigo-50/60" : "")
+          "flex flex-1 flex-col overflow-y-auto px-1.5 py-2 " +
+          (isOver ? "bg-accent-soft/60" : "")
         }
       >
         {tasks.length === 0 ? (
-          <p className="px-1 py-1.5 text-[11px] text-neutral-300">
-            Inbox is empty.
-          </p>
+          <p className="px-1 py-1.5 text-[12px] text-faint">Inbox is empty.</p>
         ) : (
           <SortableContext
             items={tasks.map((t) => t.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-2">
               {tasks.map((task) => (
                 <TaskItem
                   key={task.id}
@@ -293,11 +289,11 @@ function TimelinePanel({ preview }: { preview: DropPreview | null }) {
   if (collapsed) {
     // A thin rail so the week strip gets full width; the chevron re-expands.
     return (
-      <aside className="flex w-7 shrink-0 flex-col items-center border-l border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out">
+      <aside className="flex w-7 shrink-0 flex-col items-center border-l border-soft bg-surface transition-[width] duration-[180ms] ease-out">
         <button
           onClick={toggle}
           title="Expand timeline"
-          className="flex h-7 w-7 items-center justify-center text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          className="flex h-7 w-7 items-center justify-center text-muted hover:bg-accent-faint hover:text-text"
         >
           ‹
         </button>
@@ -308,7 +304,7 @@ function TimelinePanel({ preview }: { preview: DropPreview | null }) {
   return (
     <aside
       style={{ width, transition: resizing ? "none" : undefined }}
-      className="relative flex shrink-0 flex-col border-l border-neutral-200 bg-white transition-[width] duration-[180ms] ease-out"
+      className="relative flex shrink-0 flex-col border-l border-soft bg-surface transition-[width] duration-[180ms] ease-out"
     >
       <PanelSplitter
         side="left"
@@ -317,14 +313,12 @@ function TimelinePanel({ preview }: { preview: DropPreview | null }) {
         defaultWidth={TIMELINE_DEFAULT_WIDTH}
         onResizingChange={setResizing}
       />
-      <div className="flex items-center justify-between border-b border-neutral-200 px-2 py-1">
-        <h2 className="truncate text-[11px] font-semibold text-neutral-700">
-          {label}
-        </h2>
+      <div className="flex items-center justify-between border-b border-soft px-2 py-1.5">
+        <h2 className="truncate text-[12px] font-medium text-text">{label}</h2>
         <button
           onClick={toggle}
           title="Collapse timeline"
-          className="flex h-5 w-5 items-center justify-center rounded text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+          className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-accent-faint hover:text-text"
         >
           ›
         </button>
@@ -652,7 +646,7 @@ export function PlannerShell() {
   const focusDayStartId = pickFocusDayStart(todaysTasks);
 
   return (
-    <div className="flex h-full flex-col bg-neutral-50 text-neutral-800">
+    <div className="flex h-full flex-col bg-surface text-text">
       {/* This bar IS the native macOS titlebar (titleBarStyle Overlay). The
           webview extends under it; the traffic lights float over the top-left,
           so we left-pad past them and left-align our controls. The empty space
@@ -660,7 +654,7 @@ export function PlannerShell() {
           buttons are normal interactive children and stay clickable. */}
       <header
         data-tauri-drag-region
-        className="flex h-9 shrink-0 items-center justify-end gap-1.5 border-b border-neutral-200 bg-white px-3"
+        className="flex h-9 shrink-0 items-center justify-end gap-1.5 border-b border-soft bg-surface px-3"
       >
         <button
           onClick={() => focusDayStartId != null && openFocus(focusDayStartId)}
@@ -671,10 +665,11 @@ export function PlannerShell() {
               : "Plan a task on the timeline to focus your day"
           }
           className={
-            "rounded border px-1.5 py-0.5 text-[11px] font-medium " +
+            // The one primary button carries the accent (filled), at rest.
+            "rounded px-2 py-0.5 text-[12px] font-semibold " +
             (focusDayStartId != null
-              ? "border-indigo-200 bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
-              : "cursor-default border-neutral-200 text-neutral-300")
+              ? "bg-accent text-white hover:bg-accent-strong"
+              : "cursor-default text-faint")
           }
         >
           ▶ Focus day
@@ -684,7 +679,7 @@ export function PlannerShell() {
             if (!isToday) setDate(todayKey());
             scrollToToday();
           }}
-          className="rounded border border-neutral-200 px-1.5 py-0.5 text-[11px] text-neutral-600 hover:bg-neutral-100"
+          className="rounded px-2 py-0.5 text-[12px] text-muted hover:bg-accent-faint hover:text-text"
         >
           Jump to today
         </button>
@@ -711,7 +706,7 @@ export function PlannerShell() {
             onScroll={onScroll}
           >
             {weekLoading && weekDays.length === 0 ? (
-              <p className="px-4 py-3 text-[13px] text-neutral-400">Loading…</p>
+              <p className="px-4 py-3 text-[13px] text-muted">Loading…</p>
             ) : (
               <div className="flex h-full min-w-max">
                 {weekDays.map((date) => (
@@ -736,23 +731,23 @@ export function PlannerShell() {
           modifiers={activeBlock ? [snapBlockToGrid] : undefined}
         >
           {activeTask ? (
-            // A faithful, slightly-lifted copy of the card: title + estimate
-            // chip (so the user sees the duration that sizes the drop-ghost),
-            // plus the priority left-rail accent for fidelity.
+            // A faithful, slightly-lifted copy of the card: title + a quiet
+            // estimate readout (so the user sees the duration that sizes the
+            // drop-ghost), plus the priority left-rail for fidelity.
             <div
               className={
-                "w-56 rounded-md border border-neutral-300 bg-white px-2 py-1.5 shadow-lg rotate-[1deg] " +
+                "w-56 rounded-md border border-hairline bg-surface-raised px-3 py-2 shadow-lg rotate-[1deg] " +
                 (activeTask.priority > 0
                   ? "border-l-2 " + priorityMeta(activeTask.priority).rail
                   : "")
               }
             >
-              <div className="flex items-center gap-1.5">
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium leading-5 text-neutral-800">
+              <div className="flex items-center gap-2">
+                <span className="min-w-0 flex-1 truncate text-[14px] font-medium leading-5 text-text">
                   {activeTask.title}
                 </span>
                 {activeTask.estimate_minutes != null && (
-                  <span className="shrink-0 rounded bg-indigo-50 px-1 py-0.5 text-[11px] font-medium tabular-nums text-indigo-600">
+                  <span className="shrink-0 text-[12px] tabular-nums text-muted">
                     {formatDuration(activeTask.estimate_minutes)}
                   </span>
                 )}

@@ -3,9 +3,10 @@ import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration, todayKey } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
-import { parseTags, tagColor } from "../lib/tags";
+import { parseTags } from "../lib/tags";
 import { htmlToPlainText } from "../lib/text";
 import { Checkbox } from "./Checkbox";
+import { TagChip } from "./TagChip";
 
 // Whole days that `planned_date` is behind today, for the "overdue by Nd" hint.
 function overdueDays(plannedDate: string | null): number {
@@ -39,29 +40,30 @@ export function OverdueRow({ task }: { task: Task }) {
   const meta = priorityMeta(task.priority);
 
   // Priority left rail. border-left-color is more specific than the hover's
-  // generic border-color swap, so the rail color survives the rose hover border.
+  // generic border-color swap, so the rail color survives the hover border.
   const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
 
-  const hasMeta =
-    daysLate > 0 ||
+  const restTag = tags[0];
+  const hasRestMeta = daysLate > 0 || running || !!restTag;
+  const hasHoverExtra =
     task.estimate_minutes != null ||
-    tags.length > 0 ||
-    running ||
     task.actual_minutes > 0 ||
     (!!task.subtask_total && task.subtask_total > 0) ||
-    (!!task.attachment_count && task.attachment_count > 0);
+    (!!task.attachment_count && task.attachment_count > 0) ||
+    tags.length > 1;
+  const showFooter = hasRestMeta || (hovered && hasHoverExtra);
 
   return (
     <li
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        "rounded-md border bg-white px-2 py-1.5 " +
-        (hovered ? "border-rose-200 shadow-sm" : "border-neutral-200") +
+        "rounded-md border bg-surface-raised px-3 py-2 transition-shadow duration-150 ease-out " +
+        (hovered ? "border-hairline shadow-sm" : "border-transparent") +
         railClass
       }
     >
-      <div className="flex items-start gap-1.5">
+      <div className="flex items-start gap-2">
         <span className="flex h-5 shrink-0 items-center">
           <Checkbox checked={done} onChange={() => toggleComplete(task)} />
         </span>
@@ -70,8 +72,8 @@ export function OverdueRow({ task }: { task: Task }) {
           onClick={open}
           title={task.title}
           className={
-            "min-w-0 flex-1 line-clamp-3 text-left text-[13px] font-medium leading-5 " +
-            (done ? "text-neutral-400 line-through" : "text-neutral-800")
+            "min-w-0 flex-1 line-clamp-3 text-left text-[14px] font-medium leading-5 " +
+            (done ? "text-muted line-through" : "text-text")
           }
         >
           {task.title}
@@ -81,7 +83,7 @@ export function OverdueRow({ task }: { task: Task }) {
           onClick={() => moveToToday(task.id)}
           title="Move to today"
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[10px] font-medium leading-none text-rose-500 hover:bg-rose-50 hover:text-rose-600 " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] font-medium leading-none text-alert hover:bg-alert-soft " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
@@ -90,73 +92,72 @@ export function OverdueRow({ task }: { task: Task }) {
       </div>
 
       {snippet && (
-        <p className="line-clamp-2 pl-[1.375rem] pt-0.5 text-[11px] leading-snug text-neutral-400">
+        <p className="line-clamp-2 pl-7 pt-1 text-[12px] leading-snug text-muted">
           {snippet}
         </p>
       )}
 
-      {hasMeta && (
-        <div className="flex flex-wrap items-center gap-1 pl-[1.375rem] pt-0.5 text-[11px] leading-none text-neutral-400">
+      {showFooter && (
+        <div className="flex flex-wrap items-center gap-2 pl-7 pt-1 text-[12px] leading-none text-muted">
           {daysLate > 0 && (
             <span
               title="How long this task is overdue"
-              className="rounded bg-rose-50 px-1 py-0.5 font-medium tabular-nums text-rose-500"
+              className="font-medium tabular-nums text-alert"
             >
               {daysLate}d late
             </span>
           )}
-          {task.estimate_minutes != null && (
-            <button
-              onClick={open}
-              title="Estimate"
-              className="rounded bg-indigo-50 px-1 py-0.5 font-medium tabular-nums text-indigo-600"
-            >
-              {formatDuration(task.estimate_minutes)}
-            </button>
-          )}
-          {task.actual_minutes > 0 && (
-            <button
-              onClick={open}
-              title="Tracked time"
-              className="rounded bg-emerald-50 px-1 py-0.5 font-medium tabular-nums text-emerald-600"
-            >
-              {formatDuration(task.actual_minutes)}
-            </button>
-          )}
           {running && (
             <span
               title="Timer running"
-              className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500"
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
             />
           )}
-          {!!task.subtask_total && task.subtask_total > 0 && (
-            <button
-              onClick={open}
-              title="Subtasks"
-              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
-            >
-              ☑ {task.subtask_done ?? 0}/{task.subtask_total}
-            </button>
+          {restTag && <TagChip name={restTag} onClick={open} />}
+
+          {hovered && (
+            <>
+              {task.estimate_minutes != null && (
+                <button
+                  onClick={open}
+                  title="Estimate"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  {formatDuration(task.estimate_minutes)}
+                </button>
+              )}
+              {task.actual_minutes > 0 && (
+                <button
+                  onClick={open}
+                  title="Tracked time"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  {formatDuration(task.actual_minutes)} tracked
+                </button>
+              )}
+              {!!task.subtask_total && task.subtask_total > 0 && (
+                <button
+                  onClick={open}
+                  title="Subtasks"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+                </button>
+              )}
+              {!!task.attachment_count && task.attachment_count > 0 && (
+                <button
+                  onClick={open}
+                  title="Attachments"
+                  className="tabular-nums text-muted hover:text-text"
+                >
+                  📎 {task.attachment_count}
+                </button>
+              )}
+              {tags.slice(1).map((t) => (
+                <TagChip key={t} name={t} onClick={open} />
+              ))}
+            </>
           )}
-          {!!task.attachment_count && task.attachment_count > 0 && (
-            <button
-              onClick={open}
-              title="Attachments"
-              className="rounded bg-neutral-100 px-1 py-0.5 font-medium tabular-nums text-neutral-500"
-            >
-              📎 {task.attachment_count}
-            </button>
-          )}
-          {tags.slice(0, 2).map((t) => (
-            <button
-              key={t}
-              onClick={open}
-              className={"rounded px-1 py-0.5 font-medium " + tagColor(t)}
-            >
-              {t}
-            </button>
-          ))}
-          {tags.length > 2 && <span>+{tags.length - 2}</span>}
         </div>
       )}
     </li>

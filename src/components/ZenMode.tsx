@@ -155,7 +155,7 @@ export function ZenMode() {
         <span className="text-neutral-300">
           {task.scheduled_start} - {endLabel}
         </span>{" "}
-        <span className={remaining >= 0 ? "text-neutral-500" : "text-amber-400"}>
+        <span className={remaining >= 0 ? "text-neutral-500" : "text-alert"}>
           - {remainLabel}
         </span>
       </p>
@@ -202,7 +202,7 @@ export function ZenMode() {
   const doneCount = subtasks.filter((s) => s.done).length;
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto bg-neutral-900 text-neutral-100">
+    <div className="fixed inset-0 z-[60] overflow-y-auto bg-focus-bg text-neutral-100">
       <div className="mx-auto flex min-h-full w-full max-w-2xl flex-col px-8 py-10">
         {/* Top bar: Pop out + Exit. */}
         <div className="mb-10 flex items-center justify-end gap-1">
@@ -246,13 +246,13 @@ export function ZenMode() {
             <div
               className={
                 "flex items-center gap-2 text-[15px] font-medium tabular-nums " +
-                (pomoIsWork ? "text-indigo-300" : "text-emerald-300")
+                (pomoIsWork ? "text-focus-accent" : "text-neutral-400")
               }
             >
               <span
                 className={
                   "h-2 w-2 rounded-full " +
-                  (pomoIsWork ? "bg-indigo-400" : "bg-emerald-400") +
+                  (pomoIsWork ? "bg-focus-accent" : "bg-neutral-500") +
                   (pomoPaused ? " opacity-40" : "")
                 }
               />
@@ -289,8 +289,8 @@ export function ZenMode() {
         ) : (
           <div className="mt-3 flex flex-wrap items-center gap-3">
             {sessionLabel && (
-              <div className="flex items-center gap-2 text-[13px] text-emerald-400">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+              <div className="flex items-center gap-2 text-[13px] text-focus-accent">
+                <span className="h-2 w-2 rounded-full bg-focus-accent" />
                 {sessionLabel}
               </div>
             )}
@@ -363,7 +363,7 @@ export function ZenMode() {
           </button>
           <button
             onClick={() => completeFocus()}
-            className="rounded-md bg-indigo-500 px-6 py-2.5 text-[15px] font-medium text-white hover:bg-indigo-400"
+            className="rounded-md bg-accent px-6 py-2.5 text-[15px] font-medium text-white hover:bg-accent-strong"
           >
             Complete
           </button>

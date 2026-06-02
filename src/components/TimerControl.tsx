@@ -46,7 +46,7 @@ export function TimerControl({ task }: { task: Task }) {
           if (e.key === "Enter") commit();
           if (e.key === "Escape") setEditing(false);
         }}
-        className="w-10 rounded border border-neutral-300 px-1 py-0.5 text-center text-[10px] outline-none"
+        className="w-10 rounded border border-hairline px-1 py-0.5 text-center text-[12px] outline-none"
       />
     );
   }
@@ -59,10 +59,10 @@ export function TimerControl({ task }: { task: Task }) {
         setEditing(true);
       }}
       className={
-        "rounded px-1.5 py-0.5 text-[10px] font-medium tabular-nums " +
+        "rounded px-1.5 py-0.5 text-[12px] tabular-nums " +
         (running
-          ? "bg-emerald-100 text-emerald-700"
-          : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100")
+          ? "bg-accent-soft font-medium text-accent"
+          : "text-muted hover:bg-accent-faint hover:text-text")
       }
     >
       {formatDuration(liveMinutes)}

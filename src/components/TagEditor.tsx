@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { parseTags, serializeTags, tagColor } from "../lib/tags";
+import { parseTags, serializeTags } from "../lib/tags";
+import { TagChip } from "./TagChip";
 
 interface TagEditorProps {
   value: string | null;
@@ -21,21 +22,18 @@ export function TagEditor({ value, onChange }: TagEditorProps) {
   return (
     <div className="flex flex-wrap items-center gap-1">
       {tags.map((t) => (
-        <span
+        <TagChip
           key={t}
-          className={
-            "flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium " +
-            tagColor(t)
+          name={t}
+          trailing={
+            <button
+              onClick={() => remove(t)}
+              className="text-muted opacity-60 hover:opacity-100"
+            >
+              ✕
+            </button>
           }
-        >
-          {t}
-          <button
-            onClick={() => remove(t)}
-            className="opacity-60 hover:opacity-100"
-          >
-            ✕
-          </button>
-        </span>
+        />
       ))}
       <input
         value={input}
@@ -50,7 +48,7 @@ export function TagEditor({ value, onChange }: TagEditorProps) {
           }
         }}
         placeholder="+ tag"
-        className="w-16 bg-transparent text-[11px] outline-none placeholder-neutral-400"
+        className="w-16 bg-transparent text-[12px] outline-none placeholder-faint"
       />
     </div>
   );

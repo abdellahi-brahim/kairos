@@ -14,20 +14,19 @@ export function serializeTags(tags: string[]): string | null {
   return tags.length ? JSON.stringify(tags) : null;
 }
 
-const PALETTE = [
-  "bg-rose-100 text-rose-700",
-  "bg-amber-100 text-amber-700",
-  "bg-emerald-100 text-emerald-700",
-  "bg-sky-100 text-sky-700",
-  "bg-violet-100 text-violet-700",
-  "bg-pink-100 text-pink-700",
-  "bg-teal-100 text-teal-700",
-  "bg-indigo-100 text-indigo-700",
-];
+// A tag chip is now a single near-neutral lozenge: soft surface + muted text,
+// with a tiny colored dot for at-a-glance identity. The chip itself never
+// carries chroma (no more 8-color rainbow); only the small dot does, drawn from
+// three low-chroma hues so the wall of chips stays calm.
+export const TAG_CHIP_CLASS = "bg-soft text-muted";
 
-// Deterministic color so a given tag always looks the same.
-export function tagColor(name: string): string {
+// Low-chroma dot hues (hex, used as inline background on a small span). Kept
+// muted on purpose so they read as quiet identity marks, not status signals.
+const DOT_HUES = ["#8a9bb0", "#9aa886", "#c0937e"]; // slate, sage, clay
+
+// Deterministic hue so a given tag always shows the same dot color.
+export function tagDotColor(name: string): string {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return PALETTE[h % PALETTE.length];
+  return DOT_HUES[h % DOT_HUES.length];
 }

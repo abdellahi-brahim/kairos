@@ -49,10 +49,10 @@ export function Timeline({ preview }: { preview: DropPreview | null }) {
       {hoursFor(win).map((h) => (
         <div
           key={h}
-          className="absolute inset-x-0 border-t border-neutral-100"
+          className="absolute inset-x-0 border-t border-soft"
           style={{ top: topForMinutes(h * 60, win) }}
         >
-          <span className="absolute -top-2 left-0 w-12 pr-2 text-right text-[10px] tabular-nums text-neutral-400">
+          <span className="absolute -top-2 left-0 w-12 pr-2 text-right text-[10px] tabular-nums text-muted">
             {String(h).padStart(2, "0")}:00
           </span>
         </div>
@@ -66,7 +66,7 @@ export function Timeline({ preview }: { preview: DropPreview | null }) {
       {/* Ghost preview of where the dragged task will land, at full height */}
       {preview && (
         <div
-          className="pointer-events-none absolute left-14 right-2 z-0 rounded-md border-2 border-dashed border-indigo-300 bg-indigo-100/50"
+          className="pointer-events-none absolute left-14 right-2 z-0 rounded-md border-2 border-dashed border-accent/50 bg-accent-soft/60"
           style={{
             top: topForMinutes(timeToMinutes(preview.time), win),
             height: preview.durationMin * PX_PER_MIN,
