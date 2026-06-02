@@ -7,8 +7,8 @@
    design branch: the hexes are easy to tweak in one place after a visual pass. */
 @theme {
   /* Warm-paper surfaces */
-  --color-surface: #faf9f7; /* shell background, warm off-white */
-  --color-surface-raised: #ffffff; /* cards, panels */
+  --color-surface: #efeae1; /* shell background, warm paper (dimmer, less glare) */
+  --color-surface-raised: #faf8f3; /* cards, panels: warm off-white, lifts off the paper */
 
   /* Warm near-neutral ink. Note: Tailwind v4 derives the utility name from the
      token name after --color-, so --color-muted -> text-muted/bg-muted and

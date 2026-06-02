@@ -90,12 +90,11 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
     <div
       data-day={date}
       className={
-        // ONE selection signal: a 2px accent left rail on the selected column.
-        // No bg tint, no header ring, no top border (REMOVAL of the old
-        // 4-signal stack). Soft right divider between columns. A transparent
-        // left border on unselected columns keeps content alignment identical.
-        "flex w-60 shrink-0 flex-col border-r border-soft border-l-2 " +
-        (isSelected ? "border-l-accent" : "border-l-transparent")
+        // ONE selection signal: a quiet accent-tinted wash on the selected
+        // column. No hard rail (it read as a heavy dark separator), no header
+        // ring, no top border. Soft right divider between columns.
+        "flex w-60 shrink-0 flex-col border-r border-soft " +
+        (isSelected ? "bg-accent-soft/60" : "")
       }
     >
       <button
