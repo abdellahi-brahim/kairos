@@ -10,6 +10,7 @@ import * as repo from "./db";
 import { dayRange, shiftDay, todayKey } from "./lib/date";
 import { timeToMinutes } from "./lib/timeline";
 import * as prefs from "./lib/prefs";
+import { DEFAULT_THEME, applyTheme, normalizeTheme } from "./lib/themes";
 
 type Bucket = "day" | "backlog";
 
@@ -196,6 +197,12 @@ interface PlannerState {
   timelineCollapsed: boolean;
   toggleTimeline: () => void;
 
+  // Active theme id (see src/lib/themes.ts). Persisted to localStorage; on set
+  // we also flip document.documentElement.dataset.theme so the whole shell
+  // re-themes live.
+  theme: string;
+  setTheme: (id: string) => void;
+
   // Persisted panel widths (px). Setters clamp to each panel's allowed range.
   inboxWidth: number;
   setInboxWidth: (px: number) => void;
@@ -364,6 +371,15 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       prefs.write("timelineCollapsed", next);
       return { timelineCollapsed: next };
     }),
+
+  // Initial value mirrors what main.tsx applied synchronously to <html>.
+  theme: normalizeTheme(prefs.readString("theme", DEFAULT_THEME)),
+  setTheme: (id) => {
+    const next = normalizeTheme(id);
+    prefs.write("theme", next);
+    applyTheme(next);
+    set({ theme: next });
+  },
 
   inboxWidth: clamp(
     prefs.readNumber("inboxWidth", INBOX_DEFAULT_WIDTH),

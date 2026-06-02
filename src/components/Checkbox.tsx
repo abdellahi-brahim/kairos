@@ -49,8 +49,10 @@ export function Checkbox({
         strokeLinejoin="round"
         style={{
           // Draw/fade in over ~120ms when checked. An empty box shows a faint
-          // ghost check on hover as a click affordance.
-          color: checked ? "#ffffff" : "#4c5b6e",
+          // ghost check on hover as a click affordance. The unchecked ghost
+          // check reads the live accent token so it follows the active theme
+          // (dark themes need a light-on-dark accent here, not a fixed slate).
+          color: checked ? "#ffffff" : "var(--color-accent)",
           opacity: checked ? 1 : hovered ? 0.5 : 0,
           transform: checked ? "scale(1)" : "scale(0.6)",
           transition: "opacity 120ms ease, transform 120ms ease, color 120ms ease",

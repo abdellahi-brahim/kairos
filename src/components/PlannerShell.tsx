@@ -43,6 +43,7 @@ import { Timeline, type DropPreview } from "./Timeline";
 import { BlockCard, blockSurfaceClass } from "./BlockCard";
 import { InsertionContext, type Insertion } from "./InsertionContext";
 import { TimelineWindowContext } from "./TimelineWindowContext";
+import { ThemePicker } from "./ThemePicker";
 import * as dragCursor from "../lib/dragCursor";
 
 // While moving a timeline block, lock it to the vertical axis. By default we
@@ -683,6 +684,7 @@ export function PlannerShell() {
         >
           Jump to today
         </button>
+        <ThemePicker />
       </header>
 
       <DndContext

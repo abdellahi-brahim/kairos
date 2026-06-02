@@ -28,7 +28,16 @@ export function readBool(key: string, fallback: boolean): boolean {
   }
 }
 
-export function write(key: string, value: number | boolean): void {
+export function readString(key: string, fallback: string): string {
+  try {
+    const raw = localStorage.getItem(PREFIX + key);
+    return raw == null ? fallback : raw;
+  } catch {
+    return fallback;
+  }
+}
+
+export function write(key: string, value: number | boolean | string): void {
   try {
     localStorage.setItem(PREFIX + key, String(value));
   } catch {

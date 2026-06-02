@@ -1,46 +1,188 @@
 @import "tailwindcss";
 
-/* Calm-pass design tokens. ONE accent (a calm desaturated slate/ink-blue, not
-   Tailwind indigo) + warm neutrals + one alert. Exposed as Tailwind utilities
-   through @theme so components use bg-surface / text-muted / border-hairline /
-   text-accent / bg-accent instead of raw neutral-* / indigo-* classes. This is a
-   design branch: the hexes are easy to tweak in one place after a visual pass. */
-@theme {
-  /* Warm-paper surfaces */
-  --color-surface: #f0efea; /* shell: soft warm-grey field (dim, not beige) */
-  --color-surface-raised: #fdfcf9; /* cards: near-white, lifts cleanly off the field */
+/* ============================================================================
+   RUNTIME THEME SYSTEM
+   ----------------------------------------------------------------------------
+   The calm-pass design tokens (bg-surface / text-muted / border-hairline /
+   text-accent / bg-accent / ...) are now RUNTIME-SWITCHABLE via a data-theme
+   attribute on <html>. The mechanism is a two-layer indirection:
 
-  /* Warm near-neutral ink. Note: Tailwind v4 derives the utility name from the
-     token name after --color-, so --color-muted -> text-muted/bg-muted and
-     --color-faint -> text-faint. (A --color-text-muted would become the awkward
-     text-text-muted.) --color-text stays as primary -> text-text. */
-  --color-text: #33312e; /* primary text */
-  --color-muted: #7a746c; /* secondary / meta */
-  --color-faint: #a8a29a; /* hints, placeholders, drag handle */
+     1. @theme inline below maps every Tailwind color token to a --k-* var
+        (e.g. --color-surface: var(--k-surface)). "inline" is the critical
+        keyword: it tells Tailwind v4 to KEEP the var() reference in the emitted
+        utilities instead of resolving it at build time. So the generated CSS is
+        .bg-surface { background-color: var(--color-surface) } and
+        --color-surface itself resolves to var(--k-surface).
+
+     2. Each theme is a plain CSS block ([data-theme="<id>"]) further down that
+        sets the FULL set of --k-* values. Switching the data-theme attribute
+        re-points every --k-* var, which cascades through --color-* into every
+        utility live - no rebuild, no React re-render.
+
+   Token names are unchanged (components depend on them). Only the VALUES move,
+   and they move at runtime. See src/lib/themes.ts for the picker registry. */
+@theme inline {
+  /* Surfaces */
+  --color-surface: var(--k-surface); /* shell field */
+  --color-surface-raised: var(--k-surface-raised); /* cards, lifts off the field */
+
+  /* Ink. Tailwind derives the utility name from the part after --color-, so
+     --color-muted -> text-muted, --color-faint -> text-faint, and
+     --color-text stays primary -> text-text. */
+  --color-text: var(--k-text); /* primary text */
+  --color-muted: var(--k-muted); /* secondary / meta */
+  --color-faint: var(--k-faint); /* hints, placeholders, drag handle */
 
   /* Hairlines + dividers */
-  --color-hairline: #e7e3dd; /* card/panel border */
-  --color-soft: #f0ede8; /* dividers, gridlines */
+  --color-hairline: var(--k-hairline); /* card/panel border */
+  --color-soft: var(--k-soft); /* dividers, gridlines */
 
-  /* THE one accent: a calm, slightly-desaturated ink-blue/slate */
-  --color-accent: #4c5b6e;
-  --color-accent-strong: #3d4a5a; /* hover/pressed */
-  --color-accent-soft: #eef1f4; /* tint backgrounds, selection wash */
-  --color-accent-faint: #f5f7f9; /* very light hover wash */
+  /* THE one accent (per-theme) */
+  --color-accent: var(--k-accent);
+  --color-accent-strong: var(--k-accent-strong); /* hover/pressed */
+  --color-accent-soft: var(--k-accent-soft); /* tint backgrounds, selection wash */
+  --color-accent-faint: var(--k-accent-faint); /* very light hover wash */
 
-  /* One alert, used ONLY for overdue: a soft terracotta/rose */
-  --color-alert: #b06a56;
-  --color-alert-soft: #f6edea;
+  /* One alert, used ONLY for overdue */
+  --color-alert: var(--k-alert);
+  --color-alert-soft: var(--k-alert-soft);
 
-  /* Dark focus surfaces (Zen / FocusWidget) share the same accent family. The
-     dark side reads the lighter tints of the accent so light + dark feel like
-     one product. */
-  --color-focus-bg: #1c1b1a; /* warm near-black, matches the warm light side */
-  --color-focus-accent: #93a6bd; /* the accent, lightened for dark contrast */
+  /* Dark focus surfaces (Zen / FocusWidget). In light themes these stay dark so
+     Focus mode is always a dark room; in dark themes they track the field. */
+  --color-focus-bg: var(--k-focus-bg);
+  --color-focus-accent: var(--k-focus-accent);
 }
 
-:root {
+/* ----------------------------------------------------------------------------
+   THEME PRESETS - each sets the FULL set of --k-* vars. :root carries the
+   default ("paper") so the app is themed even before JS runs. Every other theme
+   overrides via [data-theme="<id>"]. Ids match src/lib/themes.ts.
+   --------------------------------------------------------------------------- */
+
+/* paper (default) - warm light: soft lightly-warm grey field, crisp near-white
+   cards, calm slate-ink accent, terracotta alert. */
+:root,
+[data-theme="paper"] {
   color-scheme: light;
+  --k-surface: #eceae3;
+  --k-surface-raised: #ffffff;
+  --k-text: #33312e;
+  --k-muted: #756f67;
+  --k-faint: #a8a29a;
+  --k-hairline: #e3ded6;
+  --k-soft: #ebe7e0;
+  --k-accent: #4c5b6e;
+  --k-accent-strong: #3d4a5a;
+  --k-accent-soft: #eef1f4;
+  --k-accent-faint: #f5f7f9;
+  --k-alert: #b06a56;
+  --k-alert-soft: #f6edea;
+  --k-focus-bg: #1c1b1a;
+  --k-focus-accent: #93a6bd;
+}
+
+/* snow - cool clean light: cool light-grey field, white cards, clear blue
+   accent, red-ish alert. */
+[data-theme="snow"] {
+  color-scheme: light;
+  --k-surface: #f4f6f8;
+  --k-surface-raised: #ffffff;
+  --k-text: #1f2937;
+  --k-muted: #64748b;
+  --k-faint: #94a3b8;
+  --k-hairline: #e2e8f0;
+  --k-soft: #eef2f6;
+  --k-accent: #3b6db0;
+  --k-accent-strong: #2f5990;
+  --k-accent-soft: #e8f0fa;
+  --k-accent-faint: #f1f6fc;
+  --k-alert: #c0473f;
+  --k-alert-soft: #fbe9e8;
+  --k-focus-bg: #131722;
+  --k-focus-accent: #8fb6ec;
+}
+
+/* sand - warm sepia light: tasteful warm paper (crisp, not muddy), clay accent. */
+[data-theme="sand"] {
+  color-scheme: light;
+  --k-surface: #efe7d8;
+  --k-surface-raised: #fbf6ec;
+  --k-text: #3a342a;
+  --k-muted: #7e7361;
+  --k-faint: #ada08a;
+  --k-hairline: #e3d8c4;
+  --k-soft: #ece2d1;
+  --k-accent: #b06a44;
+  --k-accent-strong: #934f30;
+  --k-accent-soft: #f3e6d8;
+  --k-accent-faint: #f8efe4;
+  --k-alert: #b0432f;
+  --k-alert-soft: #f4e2db;
+  --k-focus-bg: #20190f;
+  --k-focus-accent: #d8a877;
+}
+
+/* dim - soft dark: warm charcoal field, slightly lighter cards, light warm
+   text, muted soft-blue accent. Easy on the eyes. */
+[data-theme="dim"] {
+  color-scheme: dark;
+  --k-surface: #1f1e1d;
+  --k-surface-raised: #2a2826;
+  --k-text: #e8e4dd;
+  --k-muted: #a39c91;
+  --k-faint: #746f66;
+  --k-hairline: #383531;
+  --k-soft: #2f2c29;
+  --k-accent: #8aa6c2;
+  --k-accent-strong: #a3bcd6;
+  --k-accent-soft: #2b3440;
+  --k-accent-faint: #262d36;
+  --k-alert: #d18a73;
+  --k-alert-soft: #3a2b25;
+  --k-focus-bg: #1a1918;
+  --k-focus-accent: #a3bcd6;
+}
+
+/* midnight - true dark: near-black field, crisp cards, higher-contrast light
+   text, brighter indigo/azure accent. */
+[data-theme="midnight"] {
+  color-scheme: dark;
+  --k-surface: #101013;
+  --k-surface-raised: #17181c;
+  --k-text: #eceef2;
+  --k-muted: #9aa0ad;
+  --k-faint: #5f6573;
+  --k-hairline: #282a31;
+  --k-soft: #1d1f24;
+  --k-accent: #7c9bff;
+  --k-accent-strong: #97b0ff;
+  --k-accent-soft: #1e2740;
+  --k-accent-faint: #181d2e;
+  --k-alert: #f0816b;
+  --k-alert-soft: #311f1b;
+  --k-focus-bg: #0c0c0f;
+  --k-focus-accent: #97b0ff;
+}
+
+/* nocturne - deep teal dark: near-black green-tinted field, crisp cards, light
+   text, a teal/green accent so dark users have a distinct second choice. */
+[data-theme="nocturne"] {
+  color-scheme: dark;
+  --k-surface: #0e1413;
+  --k-surface-raised: #15201e;
+  --k-text: #e4ece9;
+  --k-muted: #93a8a1;
+  --k-faint: #5c6f69;
+  --k-hairline: #243430;
+  --k-soft: #182320;
+  --k-accent: #48c2a8;
+  --k-accent-strong: #62d4bb;
+  --k-accent-soft: #18302b;
+  --k-accent-faint: #142623;
+  --k-alert: #e8896b;
+  --k-alert-soft: #2e201b;
+  --k-focus-bg: #0a0f0e;
+  --k-focus-accent: #62d4bb;
 }
 
 html,
@@ -98,14 +240,16 @@ body {
   padding-left: 1.25rem;
   margin: 0.25em 0;
 }
+/* Code / quote chrome reads theme tokens so the detail modal's rich text works
+   on dark themes too (it renders .rt-content in every theme, not just light). */
 .rt-content code {
-  background: #f3f4f6;
+  background: var(--color-soft);
   padding: 0 0.25em;
   border-radius: 0.25rem;
   font-size: 0.85em;
 }
 .rt-content pre {
-  background: #f3f4f6;
+  background: var(--color-soft);
   padding: 0.5rem 0.75rem;
   border-radius: 0.375rem;
   overflow-x: auto;
@@ -116,9 +260,9 @@ body {
   padding: 0;
 }
 .rt-content blockquote {
-  border-left: 3px solid #e5e7eb;
+  border-left: 3px solid var(--color-hairline);
   padding-left: 0.75rem;
-  color: #6b7280;
+  color: var(--color-muted);
   margin: 0.5em 0;
 }
 /* Focus (Zen) mode reads the same rich text on a dark surface: lighter text,
@@ -147,7 +291,7 @@ body {
 /* Placeholder text for the empty editor */
 .rt-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #9ca3af;
+  color: var(--color-faint);
   float: left;
   height: 0;
   pointer-events: none;
