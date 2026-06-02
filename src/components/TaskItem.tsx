@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { Task } from "../types";
+import type { Subtask, Task } from "../types";
 import { usePlanner } from "../store";
+import * as repo from "../db";
 import { formatDuration } from "../lib/date";
 import { priorityMeta } from "../lib/priority";
 import { parseTags } from "../lib/tags";
@@ -21,11 +22,18 @@ import { useInsertion } from "./InsertionContext";
 // metadata (scheduled time, estimate, tags, tracked time, subtasks). A bare task
 // (no notes, no metadata) stays a tight near-single-line row; the card only grows
 // as content requires.
+//
+// `detailed` mode (Day view only): the single wide column has room to breathe, so
+// the same card becomes richer - the full metadata footer shows AT REST (no hover
+// gating), the notes snippet runs longer, and existing subtasks render inline as a
+// checkable list. The default (strip/Inbox) mode is byte-for-byte unchanged: a
+// quiet two-item resting footer with the rest revealed on hover.
 export function TaskItem({
   task,
   bucket,
   column,
   onComplete,
+  detailed = false,
 }: {
   task: Task;
   bucket: "day" | "backlog";
@@ -38,14 +46,27 @@ export function TaskItem({
   // open/done partition so the row fades out before relocating to the Done
   // group. When omitted, completion toggles immediately (Inbox behavior).
   onComplete?: (task: Task) => void;
+  // Day view only: render the roomier, always-expanded card (full footer at rest,
+  // longer notes, inline checkable subtasks). Defaults to the calm strip card.
+  detailed?: boolean;
 }) {
   const toggleComplete = usePlanner((s) => s.toggleComplete);
   const removeTask = usePlanner((s) => s.removeTask);
   const openDetail = usePlanner((s) => s.openDetail);
   const openFocus = usePlanner((s) => s.openFocus);
+  // Detailed mode persists an inline subtask toggle directly, then asks the store
+  // to reload the day buckets so the count stays consistent with disk.
+  const refresh = usePlanner((s) => s.refresh);
 
   // JS-driven hover: WKWebView leaves CSS :hover stuck after a drag.
   const [hovered, setHovered] = useState(false);
+
+  // Detailed mode only: the task's subtasks, lazily loaded so the strip card
+  // (and any task with no subtasks) never runs a query. The card owns this list
+  // as the source of truth for the inline checklist and its progress chip, so an
+  // optimistic toggle updates both with no flash and no dependence on which
+  // bucket the Day view happens to read from.
+  const [subtasks, setSubtasks] = useState<Subtask[] | null>(null);
 
   // Within-column reorder marker: if this row is the insertion target, draw a
   // 2px accent line on the relevant edge. Provided by PlannerShell's DndContext.
@@ -69,6 +90,49 @@ export function TaskItem({
   // render the snippet only when there is actual text after stripping.
   const snippet = htmlToPlainText(task.notes);
 
+  const hasSubtasks = !!task.subtask_total && task.subtask_total > 0;
+
+  // Lazily load subtasks for the inline checklist, ONLY in detailed mode and ONLY
+  // when the row actually has some (subtask_total > 0). Keyed on the task id so a
+  // different task reuses the slot correctly; cleared back to null if the task
+  // loses all its subtasks so we do not show a stale list.
+  useEffect(() => {
+    if (!detailed || !hasSubtasks) {
+      setSubtasks(null);
+      return;
+    }
+    let alive = true;
+    repo.fetchSubtasks(task.id).then((rows) => {
+      if (alive) setSubtasks(rows);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [detailed, hasSubtasks, task.id]);
+
+  // Optimistically flip a subtask in the local list, persist, then refresh the
+  // day buckets so the store stays in sync. The progress chip reads the local
+  // list when it is loaded, so the count updates on the same render (flash-free)
+  // regardless of the refresh round-trip.
+  const toggleSubtask = (sub: Subtask) => {
+    setSubtasks((prev) =>
+      prev
+        ? prev.map((s) =>
+            s.id === sub.id ? { ...s, done: s.done ? 0 : 1 } : s,
+          )
+        : prev,
+    );
+    void repo.setSubtaskDone(sub.id, !sub.done).then(() => refresh());
+  };
+
+  // Progress chip count: prefer the live local list (detailed mode, once loaded)
+  // so an inline toggle updates it immediately; otherwise use the row's computed
+  // count from the fetch query.
+  const subtaskDone =
+    subtasks != null
+      ? subtasks.filter((s) => s.done).length
+      : task.subtask_done ?? 0;
+
   // Resting footer shows AT MOST two quiet items (scheduled time + first tag,
   // or a running dot). Everything else (estimate, tracked, subtasks,
   // attachments, extra tags) is revealed on hover, keeping the card serene at
@@ -79,10 +143,15 @@ export function TaskItem({
   const hasHoverExtra =
     task.estimate_minutes != null ||
     task.actual_minutes > 0 ||
-    (!!task.subtask_total && task.subtask_total > 0) ||
+    hasSubtasks ||
     (!!task.attachment_count && task.attachment_count > 0) ||
     tags.length > 1;
-  const showFooter = hasRestMeta || (hovered && hasHoverExtra);
+  // Detailed mode reveals the full footer at rest (no hover gating); the strip
+  // card keeps the quiet two-item resting row with the rest on hover.
+  const showExtras = detailed || hovered;
+  const showFooter = detailed
+    ? hasRestMeta || hasHoverExtra
+    : hasRestMeta || (hovered && hasHoverExtra);
 
   // Priority left rail: a 2px colored left border. border-left-color is more
   // specific than the hover's generic border-color swap, so the rail color stays
@@ -102,7 +171,9 @@ export function TaskItem({
         // brings in a hairline + soft shadow (the single hover signal). relative
         // so the insertion line can span the row. border-transparent at rest
         // keeps the box metrics identical so hover never shifts layout.
-        "relative rounded-md border bg-surface-raised px-3 py-2 transition-shadow duration-150 ease-out " +
+        "relative rounded-md border bg-surface-raised transition-shadow duration-150 ease-out " +
+        // Roomier padding in detailed mode for the richer always-on content.
+        (detailed ? "px-3 py-2.5 " : "px-3 py-2 ") +
         (hovered ? "border-hairline shadow-sm" : "border-transparent") +
         railClass
       }
@@ -191,15 +262,56 @@ export function TaskItem({
           task has notes. Indented to align under the title. Rich-text HTML is
           stripped to text (never rendered raw) by htmlToPlainText. */}
       {snippet && (
-        <p className="line-clamp-2 pl-7 pt-1 text-[12px] leading-snug text-muted">
+        <p
+          className={
+            // Detailed mode shows a longer, readable description inline; the
+            // strip card keeps the tight two-line clamp.
+            "pl-7 pt-1 text-[12px] leading-snug text-muted " +
+            (detailed ? "line-clamp-6" : "line-clamp-2")
+          }
+        >
           {snippet}
         </p>
       )}
 
-      {/* Footer: at REST shows at most two quiet items (scheduled time + first
-          tag, or a running dot). Hover reveals the rest (estimate, tracked,
-          subtasks, attachments, extra tags) so the resting card stays serene.
-          Indented to align under the title. */}
+      {/* Inline subtask checklist (detailed mode only): existing subtasks render
+          as a compact checkable list using the shared Checkbox. Checking one is
+          optimistic + persisted; there is no "add" input here (that stays in the
+          modal). Indented to align under the title. */}
+      {detailed && hasSubtasks && subtasks && subtasks.length > 0 && (
+        <ul className="flex flex-col gap-1 pl-7 pt-1.5">
+          {subtasks.map((sub) => {
+            const subDone = !!sub.done;
+            return (
+              <li key={sub.id} className="flex items-start gap-2">
+                <span className="flex h-4 shrink-0 items-center">
+                  <Checkbox
+                    checked={subDone}
+                    onChange={() => toggleSubtask(sub)}
+                    title={subDone ? "Mark not done" : "Mark done"}
+                  />
+                </span>
+                <button
+                  onClick={open}
+                  title={sub.title}
+                  className={
+                    "min-w-0 flex-1 text-left text-[12px] leading-4 " +
+                    (subDone ? "text-faint line-through" : "text-muted")
+                  }
+                >
+                  {sub.title}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Footer: in the strip card, at REST shows at most two quiet items
+          (scheduled time + first tag, or a running dot) and hover reveals the
+          rest (estimate, tracked, subtasks, attachments, extra tags) so the
+          resting card stays serene. In detailed mode the full footer shows at
+          rest (showExtras is always true). Indented to align under the title. */}
       {showFooter && (
         <div className="flex flex-wrap items-center gap-2 pl-7 pt-1 text-[12px] leading-none text-muted">
           {task.scheduled_start && (
@@ -213,12 +325,12 @@ export function TaskItem({
               className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
             />
           )}
-          {/* First tag rests; remaining tags reveal on hover. */}
+          {/* First tag rests; remaining tags reveal with the extras. */}
           {restTag && <TagChip name={restTag} onClick={open} />}
 
-          {/* Hover-revealed extras: kept mounted only when hovered so resting
-              clicks never hit them, yet they appear with the card's hover. */}
-          {hovered && (
+          {/* Extras: in the strip card these are kept mounted only on hover so
+              resting clicks never hit them; in detailed mode they show at rest. */}
+          {showExtras && (
             <>
               {task.estimate_minutes != null && (
                 <button
@@ -238,13 +350,13 @@ export function TaskItem({
                   {formatDuration(task.actual_minutes)} tracked
                 </button>
               )}
-              {!!task.subtask_total && task.subtask_total > 0 && (
+              {hasSubtasks && (
                 <button
                   onClick={open}
                   title="Subtasks"
                   className="tabular-nums text-muted hover:text-text"
                 >
-                  ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+                  ☑ {subtaskDone}/{task.subtask_total}
                 </button>
               )}
               {!!task.attachment_count && task.attachment_count > 0 && (

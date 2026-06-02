@@ -185,6 +185,10 @@ export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
                       bucket="day"
                       column={date}
                       onComplete={beginComplete}
+                      // Day view: the single wide column renders each open task
+                      // as the richer always-expanded card. Strip columns and
+                      // the Done group stay quiet (default TaskItem).
+                      detailed={isDay}
                     />
                   </div>
                 );
