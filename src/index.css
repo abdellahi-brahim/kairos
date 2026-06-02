@@ -59,130 +59,170 @@
    overrides via [data-theme="<id>"]. Ids match src/lib/themes.ts.
    --------------------------------------------------------------------------- */
 
-/* paper (default) - warm light: soft lightly-warm grey field, crisp near-white
-   cards, calm slate-ink accent, terracotta alert. */
+/* Popular, proven palettes (mapped to our semantic roles by a color specialist).
+   :root carries the default (Catppuccin "latte") so the app is themed before JS
+   runs. Dark-mode rule: surface-raised is LIGHTER than surface (elevation). Ids
+   match src/lib/themes.ts. */
+
+/* latte (default) - Catppuccin Latte: warm-neutral light, mauve accent. */
 :root,
-[data-theme="paper"] {
+[data-theme="latte"] {
   color-scheme: light;
-  --k-surface: #eceae3;
+  --k-surface: #eff1f5;
   --k-surface-raised: #ffffff;
-  --k-text: #33312e;
-  --k-muted: #756f67;
-  --k-faint: #a8a29a;
-  --k-hairline: #e3ded6;
-  --k-soft: #ebe7e0;
-  --k-accent: #4c5b6e;
-  --k-accent-strong: #3d4a5a;
-  --k-accent-soft: #eef1f4;
-  --k-accent-faint: #f5f7f9;
-  --k-alert: #b06a56;
-  --k-alert-soft: #f6edea;
-  --k-focus-bg: #1c1b1a;
-  --k-focus-accent: #93a6bd;
+  --k-text: #4c4f69;
+  --k-muted: #6c6f85;
+  --k-faint: #9ca0b0;
+  --k-hairline: #dce0e8;
+  --k-soft: #e6e9ef;
+  --k-accent: #8839ef;
+  --k-accent-strong: #7022d4;
+  --k-accent-soft: #f1e6fd;
+  --k-accent-faint: #f7f0fe;
+  --k-alert: #d20f39;
+  --k-alert-soft: #fbe4e9;
+  --k-focus-bg: #1e1e2e;
+  --k-focus-accent: #cba6f7;
 }
 
-/* snow - cool clean light: cool light-grey field, white cards, clear blue
-   accent, red-ish alert. */
-[data-theme="snow"] {
+/* rose-dawn - Rose Pine Dawn: soft warm light, rose accent. */
+[data-theme="rose-dawn"] {
   color-scheme: light;
-  --k-surface: #f4f6f8;
-  --k-surface-raised: #ffffff;
-  --k-text: #1f2937;
-  --k-muted: #64748b;
-  --k-faint: #94a3b8;
-  --k-hairline: #e2e8f0;
-  --k-soft: #eef2f6;
-  --k-accent: #3b6db0;
-  --k-accent-strong: #2f5990;
-  --k-accent-soft: #e8f0fa;
-  --k-accent-faint: #f1f6fc;
-  --k-alert: #c0473f;
-  --k-alert-soft: #fbe9e8;
-  --k-focus-bg: #131722;
-  --k-focus-accent: #8fb6ec;
+  --k-surface: #faf4ed;
+  --k-surface-raised: #fffaf3;
+  --k-text: #575279;
+  --k-muted: #797593;
+  --k-faint: #9893a5;
+  --k-hairline: #f2e9e1;
+  --k-soft: #f4ede4;
+  --k-accent: #b4637a;
+  --k-accent-strong: #9c4f66;
+  --k-accent-soft: #f6e3e6;
+  --k-accent-faint: #faeef0;
+  --k-alert: #a3415a;
+  --k-alert-soft: #f3dbdf;
+  --k-focus-bg: #191724;
+  --k-focus-accent: #ebbcba;
 }
 
-/* sand - warm sepia light: tasteful warm paper (crisp, not muddy), clay accent. */
-[data-theme="sand"] {
+/* solarized-light - Solarized: iconic low-fatigue light, blue accent. */
+[data-theme="solarized-light"] {
   color-scheme: light;
-  --k-surface: #efe7d8;
-  --k-surface-raised: #fbf6ec;
-  --k-text: #3a342a;
-  --k-muted: #7e7361;
-  --k-faint: #ada08a;
-  --k-hairline: #e3d8c4;
-  --k-soft: #ece2d1;
-  --k-accent: #b06a44;
-  --k-accent-strong: #934f30;
-  --k-accent-soft: #f3e6d8;
-  --k-accent-faint: #f8efe4;
-  --k-alert: #b0432f;
-  --k-alert-soft: #f4e2db;
-  --k-focus-bg: #20190f;
-  --k-focus-accent: #d8a877;
+  --k-surface: #fdf6e3;
+  --k-surface-raised: #fffbf0;
+  --k-text: #586e75;
+  --k-muted: #657b83;
+  --k-faint: #93a1a1;
+  --k-hairline: #eee8d5;
+  --k-soft: #f4eeda;
+  --k-accent: #268bd2;
+  --k-accent-strong: #1f6fa8;
+  --k-accent-soft: #e3eef3;
+  --k-accent-faint: #eef5f8;
+  --k-alert: #dc322f;
+  --k-alert-soft: #f7e0d8;
+  --k-focus-bg: #002b36;
+  --k-focus-accent: #4ba6e0;
 }
 
-/* dim - soft dark: warm charcoal field, slightly lighter cards, light warm
-   text, muted soft-blue accent. Easy on the eyes. */
-[data-theme="dim"] {
-  color-scheme: dark;
-  --k-surface: #1f1e1d;
-  --k-surface-raised: #2a2826;
-  --k-text: #e8e4dd;
-  --k-muted: #a39c91;
-  --k-faint: #746f66;
-  --k-hairline: #383531;
-  --k-soft: #2f2c29;
-  --k-accent: #8aa6c2;
-  --k-accent-strong: #a3bcd6;
-  --k-accent-soft: #2b3440;
-  --k-accent-faint: #262d36;
-  --k-alert: #d18a73;
-  --k-alert-soft: #3a2b25;
-  --k-focus-bg: #1a1918;
-  --k-focus-accent: #a3bcd6;
+/* everforest-light - Everforest Light Medium: warm natural green light. */
+[data-theme="everforest-light"] {
+  color-scheme: light;
+  --k-surface: #fdf6e3;
+  --k-surface-raised: #fffbef;
+  --k-text: #5c6a72;
+  --k-muted: #829181;
+  --k-faint: #a6b0a0;
+  --k-hairline: #f0eada;
+  --k-soft: #f4efdf;
+  --k-accent: #8da101;
+  --k-accent-strong: #74840a;
+  --k-accent-soft: #eaeccf;
+  --k-accent-faint: #f3f4e3;
+  --k-alert: #f85552;
+  --k-alert-soft: #fbe3df;
+  --k-focus-bg: #2d353b;
+  --k-focus-accent: #a7c080;
 }
 
-/* midnight - true dark: near-black field, crisp cards, higher-contrast light
-   text, brighter indigo/azure accent. */
-[data-theme="midnight"] {
+/* mocha - Catppuccin Mocha: calm dark, mauve accent. */
+[data-theme="mocha"] {
   color-scheme: dark;
-  --k-surface: #101013;
-  --k-surface-raised: #17181c;
-  --k-text: #eceef2;
-  --k-muted: #9aa0ad;
-  --k-faint: #5f6573;
-  --k-hairline: #282a31;
-  --k-soft: #1d1f24;
-  --k-accent: #7c9bff;
-  --k-accent-strong: #97b0ff;
-  --k-accent-soft: #1e2740;
-  --k-accent-faint: #181d2e;
-  --k-alert: #f0816b;
-  --k-alert-soft: #311f1b;
-  --k-focus-bg: #0c0c0f;
-  --k-focus-accent: #97b0ff;
+  --k-surface: #1e1e2e;
+  --k-surface-raised: #313244;
+  --k-text: #cdd6f4;
+  --k-muted: #a6adc8;
+  --k-faint: #7f849c;
+  --k-hairline: #45475a;
+  --k-soft: #292a3a;
+  --k-accent: #cba6f7;
+  --k-accent-strong: #dcc0fb;
+  --k-accent-soft: #2e2b3f;
+  --k-accent-faint: #262434;
+  --k-alert: #f38ba8;
+  --k-alert-soft: #3a2630;
+  --k-focus-bg: #181825;
+  --k-focus-accent: #dcc0fb;
 }
 
-/* nocturne - deep teal dark: near-black green-tinted field, crisp cards, light
-   text, a teal/green accent so dark users have a distinct second choice. */
-[data-theme="nocturne"] {
+/* tokyo-night - Tokyo Night: premium dark, blue accent. */
+[data-theme="tokyo-night"] {
   color-scheme: dark;
-  --k-surface: #0e1413;
-  --k-surface-raised: #15201e;
-  --k-text: #e4ece9;
-  --k-muted: #93a8a1;
-  --k-faint: #5c6f69;
-  --k-hairline: #243430;
-  --k-soft: #182320;
-  --k-accent: #48c2a8;
-  --k-accent-strong: #62d4bb;
-  --k-accent-soft: #18302b;
-  --k-accent-faint: #142623;
-  --k-alert: #e8896b;
-  --k-alert-soft: #2e201b;
-  --k-focus-bg: #0a0f0e;
-  --k-focus-accent: #62d4bb;
+  --k-surface: #1a1b26;
+  --k-surface-raised: #24283b;
+  --k-text: #c0caf5;
+  --k-muted: #9aa5ce;
+  --k-faint: #565f89;
+  --k-hairline: #2f334d;
+  --k-soft: #20222f;
+  --k-accent: #7aa2f7;
+  --k-accent-strong: #9ab4f9;
+  --k-accent-soft: #232a40;
+  --k-accent-faint: #1d2233;
+  --k-alert: #f7768e;
+  --k-alert-soft: #33222b;
+  --k-focus-bg: #16161e;
+  --k-focus-accent: #9ab4f9;
+}
+
+/* nord - Nord: arctic restrained dark, frost-blue accent. */
+[data-theme="nord"] {
+  color-scheme: dark;
+  --k-surface: #2e3440;
+  --k-surface-raised: #3b4252;
+  --k-text: #eceff4;
+  --k-muted: #d8dee9;
+  --k-faint: #7b88a1;
+  --k-hairline: #434c5e;
+  --k-soft: #353c4a;
+  --k-accent: #88c0d0;
+  --k-accent-strong: #a3d2de;
+  --k-accent-soft: #323b46;
+  --k-accent-faint: #2c343f;
+  --k-alert: #bf616a;
+  --k-alert-soft: #3a2f33;
+  --k-focus-bg: #272c36;
+  --k-focus-accent: #a3d2de;
+}
+
+/* rose-moon - Rose Pine Moon: cozy muted dark, iris accent. */
+[data-theme="rose-moon"] {
+  color-scheme: dark;
+  --k-surface: #232136;
+  --k-surface-raised: #2a273f;
+  --k-text: #e0def4;
+  --k-muted: #908caa;
+  --k-faint: #6e6a86;
+  --k-hairline: #44415a;
+  --k-soft: #2a283e;
+  --k-accent: #c4a7e7;
+  --k-accent-strong: #d2bbee;
+  --k-accent-soft: #393552;
+  --k-accent-faint: #2f2b46;
+  --k-alert: #eb6f92;
+  --k-alert-soft: #3a2733;
+  --k-focus-bg: #1f1d2e;
+  --k-focus-accent: #d2bbee;
 }
 
 html,

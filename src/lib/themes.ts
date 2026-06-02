@@ -34,50 +34,64 @@ export interface ThemePreset {
 // --k-text) so the preview dots match what you get when you apply the theme.
 export const THEMES: ThemePreset[] = [
   {
-    id: "paper",
-    name: "Paper",
-    blurb: "Warm light",
+    id: "latte",
+    name: "Latte",
+    blurb: "Catppuccin light",
     dark: false,
-    swatch: { field: "#eceae3", card: "#ffffff", accent: "#4c5b6e", text: "#33312e" },
+    swatch: { field: "#eff1f5", card: "#ffffff", accent: "#8839ef", text: "#4c4f69" },
   },
   {
-    id: "snow",
-    name: "Snow",
-    blurb: "Cool light",
+    id: "rose-dawn",
+    name: "Rose Dawn",
+    blurb: "Soft rose light",
     dark: false,
-    swatch: { field: "#f4f6f8", card: "#ffffff", accent: "#3b6db0", text: "#1f2937" },
+    swatch: { field: "#faf4ed", card: "#fffaf3", accent: "#b4637a", text: "#575279" },
   },
   {
-    id: "sand",
-    name: "Sand",
-    blurb: "Warm sepia",
+    id: "solarized-light",
+    name: "Solarized Light",
+    blurb: "Low-fatigue light",
     dark: false,
-    swatch: { field: "#efe7d8", card: "#fbf6ec", accent: "#b06a44", text: "#3a342a" },
+    swatch: { field: "#fdf6e3", card: "#fffbf0", accent: "#268bd2", text: "#586e75" },
   },
   {
-    id: "dim",
-    name: "Dim",
-    blurb: "Soft dark",
-    dark: true,
-    swatch: { field: "#1f1e1d", card: "#2a2826", accent: "#8aa6c2", text: "#e8e4dd" },
+    id: "everforest-light",
+    name: "Everforest Light",
+    blurb: "Natural green light",
+    dark: false,
+    swatch: { field: "#fdf6e3", card: "#fffbef", accent: "#8da101", text: "#5c6a72" },
   },
   {
-    id: "midnight",
-    name: "Midnight",
-    blurb: "True dark",
+    id: "mocha",
+    name: "Mocha",
+    blurb: "Catppuccin dark",
     dark: true,
-    swatch: { field: "#101013", card: "#17181c", accent: "#7c9bff", text: "#eceef2" },
+    swatch: { field: "#1e1e2e", card: "#313244", accent: "#cba6f7", text: "#cdd6f4" },
   },
   {
-    id: "nocturne",
-    name: "Nocturne",
-    blurb: "Deep teal",
+    id: "tokyo-night",
+    name: "Tokyo Night",
+    blurb: "Premium dark",
     dark: true,
-    swatch: { field: "#0e1413", card: "#15201e", accent: "#48c2a8", text: "#e4ece9" },
+    swatch: { field: "#1a1b26", card: "#24283b", accent: "#7aa2f7", text: "#c0caf5" },
+  },
+  {
+    id: "nord",
+    name: "Nord",
+    blurb: "Arctic dark",
+    dark: true,
+    swatch: { field: "#2e3440", card: "#3b4252", accent: "#88c0d0", text: "#eceff4" },
+  },
+  {
+    id: "rose-moon",
+    name: "Rose Pine Moon",
+    blurb: "Cozy muted dark",
+    dark: true,
+    swatch: { field: "#232136", card: "#2a273f", accent: "#c4a7e7", text: "#e0def4" },
   },
 ];
 
-export const DEFAULT_THEME = "paper";
+export const DEFAULT_THEME = "latte";
 
 const VALID = new Set(THEMES.map((t) => t.id));
 
