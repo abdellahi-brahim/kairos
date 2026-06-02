@@ -225,6 +225,127 @@
   --k-focus-accent: #d2bbee;
 }
 
+/* vscode-dark - VS Code Dark+: the iconic editor dark, VS Code blue accent,
+   real list-selection blue as the soft tint. */
+[data-theme="vscode-dark"] {
+  color-scheme: dark;
+  --k-surface: #1e1e1e;
+  --k-surface-raised: #252526;
+  --k-text: #d4d4d4;
+  --k-muted: #9d9d9d;
+  --k-faint: #6a6a6a;
+  --k-hairline: #3c3c3c;
+  --k-soft: #2a2a2b;
+  --k-accent: #3794ff;
+  --k-accent-strong: #5aa9ff;
+  --k-accent-soft: #094771;
+  --k-accent-faint: #1f3a52;
+  --k-alert: #f14c4c;
+  --k-alert-soft: #3a2323;
+  --k-focus-bg: #1a1a1a;
+  --k-focus-accent: #5aa9ff;
+}
+
+/* vscode-light - VS Code Light+: clean editor light, VS Code blue accent. */
+[data-theme="vscode-light"] {
+  color-scheme: light;
+  --k-surface: #f3f3f3;
+  --k-surface-raised: #ffffff;
+  --k-text: #1f1f1f;
+  --k-muted: #616161;
+  --k-faint: #8e8e8e;
+  --k-hairline: #e5e5e5;
+  --k-soft: #ececec;
+  --k-accent: #005fb8;
+  --k-accent-strong: #0058a3;
+  --k-accent-soft: #cfe6ff;
+  --k-accent-faint: #eaf3ff;
+  --k-alert: #cd3131;
+  --k-alert-soft: #fbe3e1;
+  --k-focus-bg: #1e1e1e;
+  --k-focus-accent: #4daafc;
+}
+
+/* github-light - GitHub Primer light: white canvas, GitHub blue accent. */
+[data-theme="github-light"] {
+  color-scheme: light;
+  --k-surface: #f6f8fa;
+  --k-surface-raised: #ffffff;
+  --k-text: #1f2328;
+  --k-muted: #636c76;
+  --k-faint: #8c959f;
+  --k-hairline: #d0d7de;
+  --k-soft: #d8dee4;
+  --k-accent: #0969da;
+  --k-accent-strong: #0550ae;
+  --k-accent-soft: #ddf4ff;
+  --k-accent-faint: #eef6ff;
+  --k-alert: #cf222e;
+  --k-alert-soft: #ffebe9;
+  --k-focus-bg: #0d1117;
+  --k-focus-accent: #58a6ff;
+}
+
+/* github-dark - GitHub Primer dark: deep navy canvas, bright blue accent. */
+[data-theme="github-dark"] {
+  color-scheme: dark;
+  --k-surface: #0d1117;
+  --k-surface-raised: #161b22;
+  --k-text: #e6edf3;
+  --k-muted: #7d8590;
+  --k-faint: #6e7681;
+  --k-hairline: #30363d;
+  --k-soft: #21262d;
+  --k-accent: #2f81f7;
+  --k-accent-strong: #58a6ff;
+  --k-accent-soft: #15203a;
+  --k-accent-faint: #11192b;
+  --k-alert: #f85149;
+  --k-alert-soft: #2b1d1d;
+  --k-focus-bg: #010409;
+  --k-focus-accent: #58a6ff;
+}
+
+/* jetbrains-darcula - JetBrains Darcula: classic IDE dark, steel-blue accent. */
+[data-theme="jetbrains-darcula"] {
+  color-scheme: dark;
+  --k-surface: #2b2b2b;
+  --k-surface-raised: #3c3f41;
+  --k-text: #bbbbbb;
+  --k-muted: #808080;
+  --k-faint: #5c5c5c;
+  --k-hairline: #4e5254;
+  --k-soft: #323232;
+  --k-accent: #4a88c7;
+  --k-accent-strong: #6ba3da;
+  --k-accent-soft: #214283;
+  --k-accent-faint: #2d3a4f;
+  --k-alert: #ff6b68;
+  --k-alert-soft: #3a2625;
+  --k-focus-bg: #1e1f22;
+  --k-focus-accent: #6ba3da;
+}
+
+/* jetbrains-light - JetBrains New UI light: clean IDE light, blue accent. */
+[data-theme="jetbrains-light"] {
+  color-scheme: light;
+  --k-surface: #f7f8fa;
+  --k-surface-raised: #ffffff;
+  --k-text: #1a1a1a;
+  --k-muted: #6c707e;
+  --k-faint: #9aa0ad;
+  --k-hairline: #ebecf0;
+  --k-soft: #f0f1f3;
+  --k-accent: #3574f0;
+  --k-accent-strong: #2b66d9;
+  --k-accent-soft: #dbe8ff;
+  --k-accent-faint: #eef4ff;
+  --k-alert: #e35252;
+  --k-alert-soft: #fce8e8;
+  --k-focus-bg: #1e1f22;
+  --k-focus-accent: #6ba3da;
+}
+
 html,
 body,
 #root {

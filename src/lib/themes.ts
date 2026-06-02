@@ -89,6 +89,48 @@ export const THEMES: ThemePreset[] = [
     dark: true,
     swatch: { field: "#232136", card: "#2a273f", accent: "#c4a7e7", text: "#e0def4" },
   },
+  {
+    id: "vscode-light",
+    name: "VS Code Light",
+    blurb: "Editor light",
+    dark: false,
+    swatch: { field: "#f3f3f3", card: "#ffffff", accent: "#005fb8", text: "#1f1f1f" },
+  },
+  {
+    id: "vscode-dark",
+    name: "VS Code Dark",
+    blurb: "Iconic editor dark",
+    dark: true,
+    swatch: { field: "#1e1e1e", card: "#252526", accent: "#3794ff", text: "#d4d4d4" },
+  },
+  {
+    id: "github-light",
+    name: "GitHub Light",
+    blurb: "Primer light",
+    dark: false,
+    swatch: { field: "#f6f8fa", card: "#ffffff", accent: "#0969da", text: "#1f2328" },
+  },
+  {
+    id: "github-dark",
+    name: "GitHub Dark",
+    blurb: "Primer dark",
+    dark: true,
+    swatch: { field: "#0d1117", card: "#161b22", accent: "#2f81f7", text: "#e6edf3" },
+  },
+  {
+    id: "jetbrains-light",
+    name: "JetBrains Light",
+    blurb: "New UI light",
+    dark: false,
+    swatch: { field: "#f7f8fa", card: "#ffffff", accent: "#3574f0", text: "#1a1a1a" },
+  },
+  {
+    id: "jetbrains-darcula",
+    name: "JetBrains Darcula",
+    blurb: "Classic IDE dark",
+    dark: true,
+    swatch: { field: "#2b2b2b", card: "#3c3f41", accent: "#4a88c7", text: "#bbbbbb" },
+  },
 ];
 
 export const DEFAULT_THEME = "latte";
