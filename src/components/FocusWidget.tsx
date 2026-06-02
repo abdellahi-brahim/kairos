@@ -111,15 +111,19 @@ export function FocusWidget() {
     : "pointer-events-none opacity-0";
 
   return (
-    // Transparent window: pad it so the card sits inset and its shadow renders.
-    <div className="flex h-screen w-screen items-stretch p-2.5 select-none">
+    // The card FILLS the transparent window (no inset padding) so there is no
+    // visible transparent border/gutter around the badge - only the rounded
+    // corners stay transparent. No outer drop-shadow (it would be clipped by the
+    // window edge anyway and read as a hard frame); the hairline border defines
+    // the card.
+    <div className="flex h-screen w-screen items-stretch select-none">
       {/* The badge card. The body is the drag region; interactive controls below
           opt out so they remain clickable. */}
       <div
         data-tauri-drag-region
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
-        className="flex w-full flex-col justify-between rounded-2xl border border-white/10 bg-focus-bg px-3.5 py-2.5 text-neutral-100 shadow-[0_8px_30px_rgba(0,0,0,0.55)]"
+        className="flex w-full flex-col justify-between rounded-2xl border border-white/10 bg-focus-bg px-3.5 py-2.5 text-neutral-100"
       >
         {/* Top line: status dot + task title (truncated) + close on hover. */}
         <div

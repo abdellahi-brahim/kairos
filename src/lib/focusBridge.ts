@@ -170,17 +170,17 @@ export async function openFocusWidget(): Promise<void> {
   const win = new WebviewWindow(FOCUS_WIDGET_LABEL, {
     url: "/",
     title: "Focus",
-    // The window is intentionally a bit LARGER than the visible badge card. The
-    // card leaves a transparent margin inside the window so its CSS drop-shadow
-    // and rounded corners are not clipped by the window edge. We disable the
-    // native window shadow (it would draw a hard rectangle behind the round
-    // card) and draw our own soft shadow in CSS so it follows the corners.
+    // The card FILLS this window (no inset margin) so there is no visible
+    // transparent border around the badge. Because the window is transparent,
+    // macOS computes the native window shadow from the OPAQUE content - i.e. the
+    // rounded card - so shadow:true gives a proper rounded shadow that hugs the
+    // badge (not a rectangle), with no transparent gutter needed.
     width: WIDGET_W,
     height: 132,
     x,
     y,
     transparent: true,
-    shadow: false,
+    shadow: true,
     resizable: false,
     decorations: false,
     alwaysOnTop: true,
