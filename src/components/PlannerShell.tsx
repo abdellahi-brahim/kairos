@@ -348,6 +348,8 @@ export function PlannerShell() {
   const detailTaskId = usePlanner((s) => s.detailTaskId);
   const focusTaskId = usePlanner((s) => s.focusTaskId);
   const openFocus = usePlanner((s) => s.openFocus);
+  const viewMode = usePlanner((s) => s.viewMode);
+  const setViewMode = usePlanner((s) => s.setViewMode);
 
   // Drag overlay state: a list pill (column/inbox row) or a lifted block.
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -646,6 +648,12 @@ export function PlannerShell() {
   const todaysTasks = weekTasks[today] ?? (isToday ? dayTasks : []);
   const focusDayStartId = pickFocusDayStart(todaysTasks);
 
+  // Day view shows the selected day's tasks, resolved the same way the strip /
+  // Focus-day path resolves a day: prefer the loaded week column, fall back to
+  // dayTasks when the selected day is today (and not yet in the week map).
+  const selectedTasks =
+    weekTasks[selectedDate] ?? (isToday ? dayTasks : []);
+
   return (
     <div className="flex h-full flex-col bg-surface text-text">
       {/* This bar IS the native macOS titlebar (titleBarStyle Overlay). The
@@ -684,6 +692,35 @@ export function PlannerShell() {
         >
           Jump to today
         </button>
+        {/* Compact segmented Week | Day control. The active segment carries an
+            accent fill; the inactive one stays quiet (muted, hover affordance).
+            Picks the middle-region layout; selectedDate still drives WHICH day. */}
+        <div className="flex items-center overflow-hidden rounded border border-soft">
+          <button
+            onClick={() => setViewMode("week")}
+            title="Show the week strip"
+            className={
+              "px-2 py-0.5 text-[12px] font-medium " +
+              (viewMode === "week"
+                ? "bg-accent text-white"
+                : "text-muted hover:bg-accent-faint hover:text-text")
+            }
+          >
+            Week
+          </button>
+          <button
+            onClick={() => setViewMode("day")}
+            title="Expand the selected day"
+            className={
+              "px-2 py-0.5 text-[12px] font-medium " +
+              (viewMode === "day"
+                ? "bg-accent text-white"
+                : "text-muted hover:bg-accent-faint hover:text-text")
+            }
+          >
+            Day
+          </button>
+        </div>
         <ThemePicker />
       </header>
 
@@ -701,26 +738,41 @@ export function PlannerShell() {
           {/* LEFT: pinned Inbox (outside the horizontal scroll). */}
           <InboxColumn tasks={backlog} />
 
-          {/* MIDDLE: horizontally scrolling day columns, anchored on today. */}
-          <div
-            ref={stripRef}
-            className="flex-1 overflow-x-auto overflow-y-hidden"
-            onScroll={onScroll}
-          >
-            {weekLoading && weekDays.length === 0 ? (
-              <p className="px-4 py-3 text-[13px] text-muted">Loading…</p>
-            ) : (
-              <div className="flex h-full min-w-max">
-                {weekDays.map((date) => (
-                  <DayColumn
-                    key={date}
-                    date={date}
-                    tasks={weekTasks[date] ?? []}
-                  />
-                ))}
+          {/* MIDDLE: either the horizontally scrolling week strip (anchored on
+              today) or a single expanded column for the selected day. Both stay
+              inside this DndContext; the Inbox and Timeline are unchanged in
+              both modes. */}
+          {viewMode === "day" ? (
+            <div className="flex-1 overflow-y-auto">
+              <div className="mx-auto w-full max-w-2xl px-4 py-4">
+                <DayColumn
+                  date={selectedDate}
+                  tasks={selectedTasks}
+                  variant="day"
+                />
               </div>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div
+              ref={stripRef}
+              className="flex-1 overflow-x-auto overflow-y-hidden"
+              onScroll={onScroll}
+            >
+              {weekLoading && weekDays.length === 0 ? (
+                <p className="px-4 py-3 text-[13px] text-muted">Loading…</p>
+              ) : (
+                <div className="flex h-full min-w-max">
+                  {weekDays.map((date) => (
+                    <DayColumn
+                      key={date}
+                      date={date}
+                      tasks={weekTasks[date] ?? []}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* RIGHT: collapsible Timeline panel for the selected day. */}
           <TimelinePanel preview={preview} />

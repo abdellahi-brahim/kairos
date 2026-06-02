@@ -20,6 +20,10 @@ import { AddTask } from "./AddTask";
 interface DayColumnProps {
   date: string; // "yyyy-MM-dd"
   tasks: Task[];
+  // "strip" (default): a fixed-width column with a right divider and selection
+  // tint, for the horizontally scrolling week strip. "day": fills the parent
+  // width with no divider and no tint, for the single expanded Day view.
+  variant?: "strip" | "day";
 }
 
 // How long the leaving (fade + collapse) animation runs before a completed task
@@ -33,7 +37,7 @@ const COMPLETE_ANIM_MS = 150;
 // onto an empty day; rows are sortable for in-column reordering. Today's column
 // also shows an Overdue band of carry-over tasks at the top. Done tasks are
 // demoted to a collapsed "Done" group at the bottom.
-export function DayColumn({ date, tasks }: DayColumnProps) {
+export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
   const setDate = usePlanner((s) => s.setDate);
   const selectedDate = usePlanner((s) => s.selectedDate);
   const addToWeekDay = usePlanner((s) => s.addToWeekDay);
@@ -76,7 +80,10 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
   };
 
   const isToday = date === todayKey();
-  const isSelected = date === selectedDate;
+  const isDay = variant === "day";
+  // The selection tint is a strip-only signal (it disambiguates the selected
+  // column among many). In Day view there is a single column, so it is dropped.
+  const isSelected = !isDay && date === selectedDate;
   // A row that is mid-completion stays in the open (sortable) list until its
   // animation finishes, so it does not double-count or jump into Done early.
   const open = tasks.filter((t) => t.status !== "done");
@@ -92,8 +99,11 @@ export function DayColumn({ date, tasks }: DayColumnProps) {
       className={
         // ONE selection signal: a quiet accent-tinted wash on the selected
         // column. No hard rail (it read as a heavy dark separator), no header
-        // ring, no top border. Soft right divider between columns.
-        "flex w-60 shrink-0 flex-col border-r border-soft " +
+        // ring, no top border. Strip columns are fixed width with a soft right
+        // divider; the Day-view column fills its parent and stands alone (no
+        // divider, no tint).
+        "flex flex-col " +
+        (isDay ? "w-full " : "w-60 shrink-0 border-r border-soft ") +
         (isSelected ? "bg-accent-soft/60" : "")
       }
     >

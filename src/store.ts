@@ -14,6 +14,12 @@ import { DEFAULT_THEME, applyTheme, normalizeTheme } from "./lib/themes";
 
 type Bucket = "day" | "backlog";
 
+// Which layout the middle region shows. "week" = the horizontally scrolling day
+// strip; "day" = a single widened column for the selected day. selectedDate stays
+// the source of truth for WHICH day; this only picks the layout. Persisted to
+// localStorage like the other view-chrome prefs.
+export type ViewMode = "week" | "day";
+
 // Pomodoro is a fixed rhythm, not a configurable timer app: a 25 minute work
 // block followed by a 5 minute break, auto-advancing work -> break -> work.
 export const POMODORO_WORK_MIN = 25;
@@ -197,6 +203,10 @@ interface PlannerState {
   timelineCollapsed: boolean;
   toggleTimeline: () => void;
 
+  // Middle-region layout: "week" strip or single expanded "day". Persisted.
+  viewMode: ViewMode;
+  setViewMode: (mode: ViewMode) => void;
+
   // Active theme id (see src/lib/themes.ts). Persisted to localStorage; on set
   // we also flip document.documentElement.dataset.theme so the whole shell
   // re-themes live.
@@ -371,6 +381,14 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       prefs.write("timelineCollapsed", next);
       return { timelineCollapsed: next };
     }),
+
+  // Coerce the stored string to one of the two valid modes (anything else, e.g.
+  // a stale or absent value, falls back to "week").
+  viewMode: prefs.readString("viewMode", "week") === "day" ? "day" : "week",
+  setViewMode: (mode) => {
+    prefs.write("viewMode", mode);
+    set({ viewMode: mode });
+  },
 
   // Initial value mirrors what main.tsx applied synchronously to <html>.
   theme: normalizeTheme(prefs.readString("theme", DEFAULT_THEME)),
