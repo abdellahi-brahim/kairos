@@ -254,6 +254,7 @@ function InboxColumn({ tasks }: { tasks: Task[] }) {
                   task={task}
                   bucket="backlog"
                   column="inbox"
+                  detailed
                 />
               ))}
             </ul>
