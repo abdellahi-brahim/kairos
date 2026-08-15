@@ -7,9 +7,11 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependency and build output
 node_modules
 dist
 dist-ssr
+coverage
 *.local
 
 # Editor directories and files
@@ -23,8 +25,19 @@ dist-ssr
 *.sln
 *.sw?
 
-# Beads / Dolt files (added by bd init)
-.dolt/
-*.db
+# Env files
+.env
+.env.*
+!.env.example
+
+# Rust / Tauri build artifacts
+src-tauri/target/
+
+# Optional local task-tracking state (non-invasive)
+.tasks/*
+!.tasks/README.md
+
+# Optional br/beads local workspace state
+.beads/
 .beads-credential-key
-.beads/proxieddb/
+.dolt/
