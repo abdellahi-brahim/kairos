@@ -1,0 +1,152 @@
+name: Release Kairos
+run-name: ${{ inputs.channel }} release ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: Release channel
+        required: true
+        type: choice
+        options:
+          - preview
+          - stable
+        default: preview
+      tag:
+        description: Git tag to create (for example v0.1.0-preview.1 or v0.1.0)
+        required: true
+        type: string
+        default: v0.1.0-preview.1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release-macos-arm64:
+    name: macOS Apple Silicon
+    runs-on: macos-latest
+    env:
+      RELEASE_CHANNEL: ${{ inputs.channel }}
+      RELEASE_TAG: ${{ inputs.tag }}
+
+    steps:
+      - name: Validate release request
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid release tag: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+          if [[ "$RELEASE_CHANNEL" == "stable" ]]; then
+            missing=()
+            [[ -n "$APPLE_CERTIFICATE" ]] || missing+=(APPLE_CERTIFICATE)
+            [[ -n "$APPLE_CERTIFICATE_PASSWORD" ]] || missing+=(APPLE_CERTIFICATE_PASSWORD)
+            [[ -n "$APPLE_SIGNING_IDENTITY" ]] || missing+=(APPLE_SIGNING_IDENTITY)
+            [[ -n "$APPLE_ID" ]] || missing+=(APPLE_ID)
+            [[ -n "$APPLE_PASSWORD" ]] || missing+=(APPLE_PASSWORD)
+            [[ -n "$APPLE_TEAM_ID" ]] || missing+=(APPLE_TEAM_ID)
+
+            if (( ${#missing[@]} > 0 )); then
+              printf 'Stable release blocked. Missing repository secrets:\n' >&2
+              printf '  - %s\n' "${missing[@]}" >&2
+              exit 1
+            fi
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.14.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run release checks
+        run: pnpm release:check
+
+      - name: Build and publish unsigned preview
+        if: inputs.channel == 'preview'
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_SIGNING_IDENTITY: '-'
+        with:
+          tagName: ${{ inputs.tag }}
+          releaseName: Kairos ${{ inputs.tag }}
+          releaseBody: |
+            Apple Silicon preview build.
+
+            This preview uses ad-hoc signing and is not notarized. macOS may block the first launch. After copying Kairos to Applications, right-click the app and choose Open.
+
+            A signed and notarized stable release will follow once Developer ID credentials are configured.
+          releaseDraft: false
+          prerelease: true
+          generateReleaseNotes: true
+          uploadUpdaterJson: false
+          tauriScript: pnpm tauri
+          args: --target aarch64-apple-darwin
+          releaseAssetNamePattern: Kairos_[version]_[arch].[ext]
+
+      - name: Build and publish signed stable release
+        if: inputs.channel == 'stable'
+        uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          tagName: ${{ inputs.tag }}
+          releaseName: Kairos ${{ inputs.tag }}
+          releaseBody: |
+            Signed and notarized Apple Silicon release of Kairos.
+          releaseDraft: false
+          prerelease: false
+          generateReleaseNotes: true
+          uploadUpdaterJson: false
+          tauriScript: pnpm tauri
+          args: --target aarch64-apple-darwin
+          releaseAssetNamePattern: Kairos_[version]_[arch].[ext]
+
+      - name: Generate SHA-256 checksum
+        run: |
+          dmg="$(find src-tauri/target -type f -path '*/release/bundle/dmg/*.dmg' -print -quit)"
+          if [[ -z "$dmg" ]]; then
+            echo 'DMG artifact not found' >&2
+            exit 1
+          fi
+          hash="$(shasum -a 256 "$dmg" | awk '{print $1}')"
+          printf '%s  %s\n' "$hash" "$(basename "$dmg")" > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload checksum
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "$RELEASE_TAG" SHA256SUMS.txt --clobber
