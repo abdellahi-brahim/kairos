@@ -33,11 +33,13 @@ coverage
 # Rust / Tauri build artifacts
 src-tauri/target/
 
-# Optional local task-tracking state (non-invasive)
-.tasks/*
-!.tasks/README.md
-
-# Optional br/beads local workspace state
-.beads/
-.beads-credential-key
-.dolt/
+# Local agent and task context
+/AGENTS.md
+/CLAUDE.md
+/.agents/
+/.claude/
+/.codex/
+/.tasks/
+/.beads/
+/.beads-credential-key
+/.dolt/
