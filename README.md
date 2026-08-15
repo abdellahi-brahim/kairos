@@ -1,6 +1,53 @@
 # Kairos
 
-Kairos is a desktop-first daily planning app built with Tauri, React, TypeScript, and SQLite.
+Kairos is a local-first daily planner for turning tasks into time blocks and focused work. It is built with Tauri, React, TypeScript, and SQLite.
+
+<p align="center">
+	<img
+		src="docs/media/kairos-week-view.png"
+		alt="Kairos Week view with an inbox, day columns, and a daily timeline"
+		width="100%"
+	/>
+</p>
+
+## See Kairos in Action
+
+<table>
+	<tr>
+		<td width="50%" valign="top">
+			<strong>Turn tasks into a daily plan</strong><br />
+			Expand one day and place work directly on the timeline.
+			<br /><br />
+			<img
+				src="docs/media/kairos-day-view.png"
+				alt="Kairos Day view with scheduled time blocks"
+				width="100%"
+			/>
+		</td>
+		<td width="50%" valign="top">
+			<strong>Keep the context with the task</strong><br />
+			Notes, subtasks, comments, tags, estimates, and tracked time stay together.
+			<br /><br />
+			<img
+				src="docs/media/kairos-task-detail.png"
+				alt="Kairos task detail with notes, subtasks, comments, and metadata"
+				width="100%"
+			/>
+		</td>
+	</tr>
+</table>
+
+### Focus on One Thing
+
+Focus mode clears away the planner while keeping the task, its next steps, and the timer in view.
+
+<p align="center">
+	<img
+		src="docs/media/kairos-focus-mode.png"
+		alt="Kairos Focus mode with a single task and Pomodoro controls"
+		width="100%"
+	/>
+</p>
 
 ## What It Does
 
