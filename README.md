@@ -120,23 +120,13 @@ pnpm tauri build
 
 On macOS this outputs `.app` and `.dmg` bundles under `src-tauri/target/release/bundle`.
 
-## Releases
+## Download
 
-The `Release Kairos` GitHub Actions workflow is started manually and supports two channels:
+Kairos currently ships as an Apple Silicon preview for macOS. Download the DMG and its SHA-256 checksum from [GitHub Releases](https://github.com/abdellahi-brahim/kairos/releases).
 
-- `preview` builds an Apple Silicon DMG with ad-hoc signing, creates a GitHub prerelease, and uploads `SHA256SUMS.txt`.
-- `stable` builds a signed and notarized Apple Silicon DMG. It refuses to run until all Apple credentials are configured.
+The preview is not notarized, so macOS may block its first launch. After copying Kairos to Applications, right-click the app and choose **Open**. A signed and notarized stable release will follow.
 
-Stable releases require these repository secrets:
-
-- `APPLE_CERTIFICATE`: base64-encoded Developer ID Application `.p12`
-- `APPLE_CERTIFICATE_PASSWORD`: password used when exporting the `.p12`
-- `APPLE_SIGNING_IDENTITY`: full Developer ID Application identity
-- `APPLE_ID`: Apple ID used for notarization
-- `APPLE_PASSWORD`: app-specific password for that Apple ID
-- `APPLE_TEAM_ID`: Apple Developer team ID
-
-Run a preview from the GitHub Actions page with a tag such as `v0.1.0-preview.1`. Use a clean version tag such as `v0.1.0` for a stable release.
+Release instructions for maintainers live in [`.github/RELEASING.md`](.github/RELEASING.md).
 
 ## Data and Privacy
 
