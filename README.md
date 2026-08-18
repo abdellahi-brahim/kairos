@@ -1,11 +1,13 @@
 # Kairos
 
-Kairos is a local-first daily planner for turning tasks into time blocks and focused work. It is built with Tauri, React, TypeScript, and SQLite.
+Kairos is a private time blocking planner for macOS. It turns a crowded week into a realistic plan, then helps you protect the time and focus on one task at a time.
+
+No account is required. Tasks, notes, attachments, and planning history stay in an app-scoped SQLite database on your Mac.
 
 <p align="center">
 	<img
 		src="docs/media/kairos-week-view.png"
-		alt="Kairos Week view with an inbox, day columns, and a daily timeline"
+		alt="Kairos Week view with task cards across several days and a Timeline inspector"
 		width="100%"
 	/>
 </p>
@@ -15,8 +17,8 @@ Kairos is a local-first daily planner for turning tasks into time blocks and foc
 <table>
 	<tr>
 		<td width="50%" valign="top">
-			<strong>Turn tasks into a daily plan</strong><br />
-			Expand one day and place work directly on the timeline.
+			<strong>Give important work an hour</strong><br />
+			Open a day, schedule tasks beside it, and adjust the plan when reality changes.
 			<br /><br />
 			<img
 				src="docs/media/kairos-day-view.png"
@@ -25,8 +27,8 @@ Kairos is a local-first daily planner for turning tasks into time blocks and foc
 			/>
 		</td>
 		<td width="50%" valign="top">
-			<strong>Keep the context with the task</strong><br />
-			Notes, subtasks, comments, tags, estimates, and tracked time stay together.
+			<strong>Open the task, not another app</strong><br />
+			Notes, next steps, comments, files, estimates, and tracked time stay with the work.
 			<br /><br />
 			<img
 				src="docs/media/kairos-task-detail.png"
@@ -37,9 +39,9 @@ Kairos is a local-first daily planner for turning tasks into time blocks and foc
 	</tr>
 </table>
 
-### Focus on One Thing
+### Stop Planning. Start the Block.
 
-Focus mode clears away the planner while keeping the task, its next steps, and the timer in view.
+Focus mode clears the board and keeps one task, its next steps, and the session timer in view. A compact floating widget can keep the active session visible while the main window stays available.
 
 <p align="center">
 	<img
@@ -51,13 +53,35 @@ Focus mode clears away the planner while keeping the task, its next steps, and t
 
 ## What It Does
 
-- Manage tasks in day and backlog buckets
-- Plan work across a week strip with drag and drop
-- Schedule tasks on a timeline
-- Track actual time with task timers
-- Use Zen mode and Pomodoro flow for focused execution
-- Add task comments, subtasks, tags, and file attachments
-- Run a lightweight floating focus widget window
+- Capture unscheduled work in Inbox
+- Plan across fixed-width day columns without losing context
+- Drag tasks between days or onto the selected day's Timeline
+- Expand one day for notes and inline subtasks
+- Keep Timeline and Inbox in one persistent inspector
+- Track estimates and actual time
+- Add comments, tags, priority, and local file attachments
+- Run focused sessions with an optional Pomodoro rhythm
+- Keep the active session visible in a floating widget
+
+## Product Model
+
+Kairos follows one planning loop:
+
+1. **Capture** work before it is forgotten.
+2. **Shape the week** around what can realistically fit.
+3. **Commit time** on the Timeline.
+4. **Focus** on the task in front of you.
+
+The same task can appear in the week, selected day, Timeline, task details, and Focus mode. Zustand owns these loaded projections and reconciles mutations from the canonical SQLite row so each view stays current.
+
+## Architecture
+
+- `src/components/PlannerShell.tsx`: week/day workspace, drag and drop, Timeline/Inbox inspector
+- `src/store.ts`: planner state, optimistic mutations, projection reconciliation, Focus and Pomodoro state
+- `src/db.ts`: SQLite repository and task queries with derived subtask/attachment counts
+- `src/lib/taskProjection.ts`: pure reconciliation across day, week, Inbox, carry-over, and open detail state
+- `src/components/TaskItem.tsx`: shared task presentation for week cards, expanded day cards, and Inbox rows
+- `src-tauri/src/lib.rs`: Tauri plugins, SQLite migrations, and attachment file commands
 
 ## Tech Stack
 
@@ -112,6 +136,8 @@ Run full release checks used before shipping:
 pnpm release:check
 ```
 
+This runs unit tests, the TypeScript/Vite production build, and `cargo check` for the Tauri shell.
+
 ## Build Desktop Bundles
 
 ```bash
@@ -133,7 +159,18 @@ Release instructions for maintainers live in [`.github/RELEASING.md`](.github/RE
 Kairos stores planner data locally on the device in an app-scoped SQLite database.
 Attachment files are copied into the app data directory under `attachments/`.
 
+On macOS, planner data lives under:
+
+```text
+~/Library/Application Support/com.abdoul.dailyplanner/
+```
+
+The bundle identifier remains `com.abdoul.dailyplanner` so existing users keep their local database when the display name changes.
+
+## Roadmap
+
+Current product direction, including Google Calendar, Jira, private device sync, and additional desktop platforms, is published at [kairos.abdellahibrahim.com/roadmap](https://kairos.abdellahibrahim.com/roadmap/).
+
 ## Project Status
 
-Current version: 0.1.0
-This is an early public release line and may change quickly.
+Kairos is in public beta. The core workflow is usable today, while packaging, updates, integrations, and cross-platform support continue to evolve.
