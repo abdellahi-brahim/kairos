@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ListChecks, Paperclip, Trash2 } from "lucide-react";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration } from "../lib/date";
@@ -28,8 +29,7 @@ export function DoneRow({ task }: { task: Task }) {
   const snippet = htmlToPlainText(task.notes);
   const meta = priorityMeta(task.priority);
 
-  // Priority left rail, kept consistent with the open rows. border-left-color is
-  // more specific than the hover border-color swap, so the rail survives hover.
+  // Priority left rail, kept consistent with the open rows.
   const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
 
   const restTag = tags[0];
@@ -47,8 +47,8 @@ export function DoneRow({ task }: { task: Task }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        "rounded-md border bg-surface-raised px-3 py-2 transition-shadow duration-150 ease-out " +
-        (hovered ? "border-hairline shadow-sm" : "border-transparent") +
+        "rounded-md border border-transparent bg-transparent px-2.5 py-2 transition-colors duration-100 ease-out " +
+        (hovered ? "bg-accent-faint" : "") +
         railClass
       }
     >
@@ -69,11 +69,11 @@ export function DoneRow({ task }: { task: Task }) {
           aria-label="Delete task"
           onClick={() => removeTask(task.id)}
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-muted hover:bg-alert-soft hover:text-alert " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-muted hover:bg-alert-soft hover:text-alert " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
-          ✕
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
 
@@ -117,18 +117,20 @@ export function DoneRow({ task }: { task: Task }) {
                 <button
                   onClick={open}
                   title="Subtasks"
-                  className="tabular-nums text-muted hover:text-text"
+                  className="inline-flex items-center gap-1 tabular-nums text-muted hover:text-text"
                 >
-                  ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+                  <ListChecks className="h-3 w-3" />
+                  {task.subtask_done ?? 0}/{task.subtask_total}
                 </button>
               )}
               {!!task.attachment_count && task.attachment_count > 0 && (
                 <button
                   onClick={open}
                   title="Attachments"
-                  className="tabular-nums text-muted hover:text-text"
+                  className="inline-flex items-center gap-1 tabular-nums text-muted hover:text-text"
                 >
-                  📎 {task.attachment_count}
+                  <Paperclip className="h-3 w-3" />
+                  {task.attachment_count}
                 </button>
               )}
               {tags.slice(1).map((t) => (

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Check, Palette } from "lucide-react";
 import { usePlanner } from "../store";
 import { THEMES } from "../lib/themes";
 
@@ -25,7 +26,11 @@ export function ThemePicker() {
       }
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen(false);
+      }
     };
     document.addEventListener("pointerdown", onPointerDown);
     document.addEventListener("keydown", onKey);
@@ -43,22 +48,19 @@ export function ThemePicker() {
         aria-haspopup="menu"
         aria-expanded={open}
         className={
-          "flex items-center rounded px-1.5 py-0.5 text-[13px] leading-none transition-colors " +
+          "flex items-center rounded-[8px] border px-2 py-1 text-[12px] leading-none transition-colors " +
           (open
-            ? "bg-accent-soft text-accent"
-            : "text-muted hover:bg-accent-faint hover:text-text")
+            ? "border-soft bg-surface-raised text-text"
+            : "border-transparent text-muted hover:border-soft hover:bg-accent-faint hover:text-text")
         }
       >
-        {/* Palette glyph */}
-        <svg viewBox="0 0 16 16" className="h-4 w-4" fill="currentColor">
-          <path d="M8 1.5a6.5 6.5 0 0 0 0 13c.69 0 1.25-.56 1.25-1.25 0-.32-.13-.61-.33-.83-.2-.22-.32-.5-.32-.8 0-.66.54-1.2 1.2-1.2h1.4A3.3 3.3 0 0 0 14.5 7.1C14.5 3.96 11.6 1.5 8 1.5Zm-3.5 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm1.5-3a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm4 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2Zm2.5 2a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" />
-        </svg>
+        <Palette className="h-3.5 w-3.5" />
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-md border border-hairline bg-surface-raised py-1 shadow-lg"
+          className="absolute right-0 top-full z-50 mt-1.5 w-48 overflow-hidden rounded-[10px] border border-hairline bg-surface-raised p-1 shadow-[0_8px_24px_rgba(0,0,0,0.08)]"
         >
           {THEMES.map((t) => {
             const active = t.id === theme;
@@ -72,7 +74,7 @@ export function ThemePicker() {
                   setOpen(false);
                 }}
                 className={
-                  "flex w-full items-center gap-2.5 px-2.5 py-1.5 text-left transition-colors " +
+                  "flex w-full items-center gap-2.5 rounded-[8px] px-2.5 py-1.5 text-left transition-colors " +
                   (active ? "bg-accent-soft" : "hover:bg-accent-faint")
                 }
               >
@@ -91,17 +93,7 @@ export function ThemePicker() {
                   </span>
                 </span>
                 {active && (
-                  <svg
-                    viewBox="0 0 16 16"
-                    className="h-3.5 w-3.5 shrink-0 text-accent"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={2.25}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="3.5,8.5 6.5,11.5 12.5,5" />
-                  </svg>
+                  <Check className="h-3.5 w-3.5 shrink-0 text-accent" />
                 )}
               </button>
             );

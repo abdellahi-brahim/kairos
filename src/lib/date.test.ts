@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayRange, formatDuration, shiftDay } from "./date";
+import { dayRange, formatDuration, monthYear, shiftDay } from "./date";
 
 describe("date helpers", () => {
   it("shifts day keys forward and backward", () => {
@@ -21,5 +21,9 @@ describe("date helpers", () => {
     expect(formatDuration(45)).toBe("45m");
     expect(formatDuration(120)).toBe("2h");
     expect(formatDuration(135)).toBe("2h 15m");
+  });
+
+  it("formats a month title for the native toolbar", () => {
+    expect(monthYear("2026-08-18")).toBe("August 2026");
   });
 });

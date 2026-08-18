@@ -28,10 +28,9 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 export function TaskDetailModal({ taskId }: { taskId: number }) {
   const task = usePlanner((s) =>
-    [...s.dayTasks, ...s.backlog, ...s.carryOver].find((t) => t.id === taskId),
+    s.detailTask?.id === taskId ? s.detailTask : undefined,
   );
   const close = usePlanner((s) => s.closeDetail);
-  const refresh = usePlanner((s) => s.refresh);
   const editTask = usePlanner((s) => s.editTask);
   const editTaskQuiet = usePlanner((s) => s.editTaskQuiet);
   const removeTask = usePlanner((s) => s.removeTask);
@@ -41,19 +40,42 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
   const addComment = usePlanner((s) => s.addComment);
   const deleteComment = usePlanner((s) => s.deleteComment);
 
-  const [title, setTitle] = useState(task?.title ?? "");
+  const [title, setTitle] = useState("");
+  const [titleDirty, setTitleDirty] = useState(false);
   const [commentBody, setCommentBody] = useState("");
   const descTimer = useRef<number | undefined>(undefined);
+  const pendingDescHtml = useRef<string | null>(null);
 
-  const doClose = () => {
-    if (descTimer.current) window.clearTimeout(descTimer.current);
-    refresh();
+  const flushPendingDescription = async () => {
+    if (descTimer.current) {
+      window.clearTimeout(descTimer.current);
+      descTimer.current = undefined;
+    }
+    const pending = pendingDescHtml.current;
+    if (pending == null) return;
+    pendingDescHtml.current = null;
+    await editTaskQuiet(taskId, { notes: pending || null });
+  };
+
+  const doClose = async () => {
+    await flushPendingDescription();
     close();
   };
 
   useEffect(() => {
+    return () => {
+      if (descTimer.current) window.clearTimeout(descTimer.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!task) return;
+    if (!titleDirty) setTitle(task.title);
+  }, [task?.id, task?.title, titleDirty]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") doClose();
+      if (e.key === "Escape") void doClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -67,11 +89,14 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
     const next = title.trim();
     if (next && next !== task.title) editTask(task.id, { title: next });
     else setTitle(task.title);
+    setTitleDirty(false);
   };
 
   const onDescChange = (html: string) => {
+    pendingDescHtml.current = html;
     if (descTimer.current) window.clearTimeout(descTimer.current);
     descTimer.current = window.setTimeout(() => {
+      pendingDescHtml.current = null;
       editTaskQuiet(task.id, { notes: html || null });
     }, 500);
   };
@@ -86,7 +111,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-8"
-      onClick={doClose}
+      onClick={() => void doClose()}
     >
       <div
         className="mt-6 flex max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg bg-surface-raised shadow-2xl"
@@ -99,7 +124,10 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
           </span>
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              setTitleDirty(true);
+            }}
             onBlur={saveTitle}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
@@ -110,8 +138,9 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             }
           />
           <button
-            onClick={() => {
-              openFocus(task.id);
+            onClick={async () => {
+              await flushPendingDescription();
+              await openFocus(task.id);
               close();
             }}
             title="Focus on this task"
@@ -120,7 +149,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             ◎ Focus
           </button>
           <button
-            onClick={doClose}
+            onClick={() => void doClose()}
             aria-label="Close"
             className="mt-0.5 shrink-0 rounded p-1 text-[11px] leading-none text-muted hover:bg-accent-faint hover:text-text"
           >
@@ -243,7 +272,7 @@ export function TaskDetailModal({ taskId }: { taskId: number }) {
             Delete task
           </button>
           <button
-            onClick={doClose}
+            onClick={() => void doClose()}
             className="rounded-md bg-soft px-3 py-1.5 text-[11px] text-text hover:bg-hairline"
           >
             Close

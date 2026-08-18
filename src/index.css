@@ -64,25 +64,25 @@
    runs. Dark-mode rule: surface-raised is LIGHTER than surface (elevation). Ids
    match src/lib/themes.ts. */
 
-/* latte (default) - Catppuccin Latte: warm-neutral light, mauve accent. */
+/* latte (default id) - Kairos Light: neutral operational light. */
 :root,
 [data-theme="latte"] {
   color-scheme: light;
-  --k-surface: #eff1f5;
+  --k-surface: #f5f5f7;
   --k-surface-raised: #ffffff;
-  --k-text: #4c4f69;
-  --k-muted: #6c6f85;
-  --k-faint: #9ca0b0;
-  --k-hairline: #dce0e8;
-  --k-soft: #e6e9ef;
-  --k-accent: #8839ef;
-  --k-accent-strong: #7022d4;
-  --k-accent-soft: #f1e6fd;
-  --k-accent-faint: #f7f0fe;
-  --k-alert: #d20f39;
-  --k-alert-soft: #fbe4e9;
-  --k-focus-bg: #1e1e2e;
-  --k-focus-accent: #cba6f7;
+  --k-text: #1d1d1f;
+  --k-muted: #6e6e73;
+  --k-faint: #8f8f95;
+  --k-hairline: #dcdee2;
+  --k-soft: #e9eaee;
+  --k-accent: #2678d4;
+  --k-accent-strong: #1f66b3;
+  --k-accent-soft: #e7f0fb;
+  --k-accent-faint: #f2f6fc;
+  --k-alert: #c23b34;
+  --k-alert-soft: #f8e7e6;
+  --k-focus-bg: #1c1c1e;
+  --k-focus-accent: #7aa8dd;
 }
 
 /* rose-dawn - Rose Pine Dawn: soft warm light, rose accent. */
@@ -351,6 +351,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  overflow: hidden;
 }
 
 /* Focus widget window only: the native window is transparent (macOSPrivateApi),
@@ -456,4 +457,36 @@ body {
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/* Week strip: two-up columns with gentle platform-native horizontal scrolling. */
+.week-strip {
+  scroll-snap-type: x proximity;
+  overscroll-behavior-x: contain;
+}
+
+.week-strip-track {
+  width: 100%;
+}
+
+.week-strip-day {
+  /* At normal widths, 40% of the canvas that remains beside the default 320px
+     inspector. Basing this on the window rather than the live strip means
+     collapsing or resizing the inspector reveals more content without changing
+     the physical width of every day. */
+  flex: 0 0 max(18rem, calc(40vw - 8rem));
+  min-width: 18rem;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 959px) {
+  .week-strip-day {
+    flex-basis: max(18rem, calc(50vw - 10rem));
+  }
+}
+
+@media (min-width: 1400px) {
+  .week-strip-day {
+    flex-basis: max(18rem, calc(33.333vw - 6.666rem));
+  }
 }

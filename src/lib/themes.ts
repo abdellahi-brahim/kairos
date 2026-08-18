@@ -35,10 +35,10 @@ export interface ThemePreset {
 export const THEMES: ThemePreset[] = [
   {
     id: "latte",
-    name: "Latte",
-    blurb: "Catppuccin light",
+    name: "Kairos Light",
+    blurb: "Neutral operational light",
     dark: false,
-    swatch: { field: "#eff1f5", card: "#ffffff", accent: "#8839ef", text: "#4c4f69" },
+    swatch: { field: "#f5f5f7", card: "#ffffff", accent: "#2678d4", text: "#1d1d1f" },
   },
   {
     id: "rose-dawn",

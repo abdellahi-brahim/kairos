@@ -9,10 +9,12 @@ export function TagChip({
   name,
   onClick,
   trailing,
+  compact = false,
 }: {
   name: string;
   onClick?: () => void;
   trailing?: ReactNode;
+  compact?: boolean;
 }) {
   const inner = (
     <>
@@ -26,7 +28,9 @@ export function TagChip({
     </>
   );
   const cls =
-    "flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] " + TAG_CHIP_CLASS;
+    "flex items-center gap-1 rounded px-1.5 py-0.5 " +
+    (compact ? "text-[10px] leading-none " : "text-[12px] ") +
+    TAG_CHIP_CLASS;
   if (onClick) {
     return (
       <button onClick={onClick} className={cls}>

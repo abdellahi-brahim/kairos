@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ListChecks, MoveRight, Paperclip } from "lucide-react";
 import type { Task } from "../types";
 import { usePlanner } from "../store";
 import { formatDuration, todayKey } from "../lib/date";
@@ -39,8 +40,7 @@ export function OverdueRow({ task }: { task: Task }) {
   const daysLate = overdueDays(task.planned_date);
   const meta = priorityMeta(task.priority);
 
-  // Priority left rail. border-left-color is more specific than the hover's
-  // generic border-color swap, so the rail color survives the hover border.
+  // Priority left rail, matching the main task rows.
   const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
 
   const restTag = tags[0];
@@ -58,8 +58,8 @@ export function OverdueRow({ task }: { task: Task }) {
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        "rounded-md border bg-surface-raised px-3 py-2 transition-shadow duration-150 ease-out " +
-        (hovered ? "border-hairline shadow-sm" : "border-transparent") +
+        "rounded-md border border-transparent bg-transparent px-2.5 py-2 transition-colors duration-100 ease-out " +
+        (hovered ? "bg-alert-soft/70" : "") +
         railClass
       }
     >
@@ -83,11 +83,12 @@ export function OverdueRow({ task }: { task: Task }) {
           onClick={() => moveToToday(task.id)}
           title="Move to today"
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] font-medium leading-none text-alert hover:bg-alert-soft " +
+            "flex h-5 shrink-0 items-center gap-1 rounded px-1 text-[11px] font-medium leading-none text-alert hover:bg-alert-soft " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
-          → today
+          <MoveRight className="h-3.5 w-3.5" />
+          Today
         </button>
       </div>
 
@@ -139,18 +140,20 @@ export function OverdueRow({ task }: { task: Task }) {
                 <button
                   onClick={open}
                   title="Subtasks"
-                  className="tabular-nums text-muted hover:text-text"
+                  className="inline-flex items-center gap-1 tabular-nums text-muted hover:text-text"
                 >
-                  ☑ {task.subtask_done ?? 0}/{task.subtask_total}
+                  <ListChecks className="h-3 w-3" />
+                  {task.subtask_done ?? 0}/{task.subtask_total}
                 </button>
               )}
               {!!task.attachment_count && task.attachment_count > 0 && (
                 <button
                   onClick={open}
                   title="Attachments"
-                  className="tabular-nums text-muted hover:text-text"
+                  className="inline-flex items-center gap-1 tabular-nums text-muted hover:text-text"
                 >
-                  📎 {task.attachment_count}
+                  <Paperclip className="h-3 w-3" />
+                  {task.attachment_count}
                 </button>
               )}
               {tags.slice(1).map((t) => (

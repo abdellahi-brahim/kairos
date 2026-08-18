@@ -10,7 +10,7 @@ import { OverdueRow } from "./OverdueRow";
 export function OverdueBand() {
   const carryOver = usePlanner((s) => s.carryOver);
   const moveAllToToday = usePlanner((s) => s.moveAllToToday);
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   if (carryOver.length === 0) return null;
 
@@ -41,7 +41,7 @@ export function OverdueBand() {
       </div>
 
       {expanded && (
-        <ul className="flex flex-col gap-2 px-2 pb-2">
+        <ul className="flex flex-col gap-0.5 px-2 pb-2">
           {carryOver.map((task) => (
             <OverdueRow key={task.id} task={task} />
           ))}

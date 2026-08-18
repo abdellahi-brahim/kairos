@@ -31,6 +31,10 @@ export function prettyDate(key: string): string {
   return format(parseISO(key), "EEE, MMM d");
 }
 
+export function monthYear(key: string): string {
+  return format(parseISO(key), "MMMM yyyy");
+}
+
 export function relativeLabel(key: string): string | null {
   const today = todayKey();
   if (key === today) return "Today";

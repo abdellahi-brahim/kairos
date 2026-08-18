@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import {
+  CalendarClock,
+  CalendarDays,
+  ChevronRight,
+  Inbox,
+  Play,
+} from "lucide-react";
+import {
   DndContext,
   DragOverlay,
   PointerSensor,
@@ -19,12 +26,15 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import type { Task } from "../types";
+import { usePlanner, INSPECTOR_DEFAULT_WIDTH } from "../store";
 import {
-  usePlanner,
-  INBOX_DEFAULT_WIDTH,
-  TIMELINE_DEFAULT_WIDTH,
-} from "../store";
-import { formatDuration, prettyDate, relativeLabel, shiftDay, todayKey } from "../lib/date";
+  formatDuration,
+  monthYear,
+  prettyDate,
+  relativeLabel,
+  shiftDay,
+  todayKey,
+} from "../lib/date";
 import { priorityMeta } from "../lib/priority";
 import {
   DEFAULT_BLOCK_MIN,
@@ -183,121 +193,106 @@ function PanelSplitter({
   );
 }
 
-// The pinned Inbox column on the far left (does not scroll with the week strip).
-// Collapsible (mirrors TimelinePanel) and resizable from its right edge. The
-// width animates on collapse/expand but the transition is suppressed during a
-// live splitter drag so the edge tracks the pointer with no lag.
-function InboxColumn({ tasks }: { tasks: Task[] }) {
+// Inbox content lives inside the shared right inspector. It remains part of the
+// single DndContext so tasks can still move between Inbox and visible days.
+function InboxInspectorContent({ tasks }: { tasks: Task[] }) {
   const addToBacklog = usePlanner((s) => s.addToBacklog);
-  const collapsed = usePlanner((s) => s.inboxCollapsed);
-  const toggle = usePlanner((s) => s.toggleInbox);
-  const width = usePlanner((s) => s.inboxWidth);
-  const setWidth = usePlanner((s) => s.setInboxWidth);
-  const [resizing, setResizing] = useState(false);
   const { setNodeRef, isOver } = useDroppable({
     id: "col-inbox",
     data: { type: "column", date: null },
   });
 
-  if (collapsed) {
-    // A thin rail; the chevron points right because the panel expands rightward.
-    return (
-      <aside className="flex w-7 shrink-0 flex-col items-center border-r border-soft bg-surface transition-[width] duration-[180ms] ease-out">
-        <button
-          onClick={toggle}
-          title="Expand inbox"
-          className="flex h-7 w-7 items-center justify-center text-muted hover:bg-accent-faint hover:text-text"
-        >
-          ›
-        </button>
-      </aside>
-    );
-  }
-
   return (
-    // Same element type (aside) as the collapsed branch above, so React reuses
-    // the DOM node across collapse/expand and the width transition actually
-    // fires. A section here would be a different element type, so React would
-    // swap nodes and the animation would not run.
-    <aside
-      style={{ width, transition: resizing ? "none" : undefined }}
-      className="relative flex shrink-0 flex-col border-r border-soft bg-surface transition-[width] duration-[180ms] ease-out"
+    <div
+      ref={setNodeRef}
+      className={
+        "flex min-h-0 flex-1 flex-col transition-colors " +
+        (isOver ? "bg-accent-faint" : "")
+      }
     >
-      <div className="flex items-center justify-between border-b border-soft px-2 py-1.5">
-        <h2 className="text-[12px] font-medium text-muted">Inbox</h2>
-        <button
-          onClick={toggle}
-          title="Collapse inbox"
-          className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-accent-faint hover:text-text"
-        >
-          ‹
-        </button>
+      <div className="shrink-0 px-3 pb-2 pt-3">
+        <AddTask
+          placeholder="Capture a task"
+          onAdd={addToBacklog}
+          variant="capture"
+        />
       </div>
-      <div
-        ref={setNodeRef}
-        className={
-          "flex flex-1 flex-col overflow-y-auto px-1.5 py-2 " +
-          (isOver ? "bg-accent-soft/60" : "")
-        }
-      >
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-3 pt-1">
         {tasks.length === 0 ? (
-          <p className="px-1 py-1.5 text-[12px] text-faint">Inbox is empty.</p>
+          <p className="px-1 py-3 text-[12px] text-faint">Inbox clear</p>
         ) : (
-          <SortableContext
-            items={tasks.map((t) => t.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <ul className="flex flex-col gap-2">
-              {tasks.map((task) => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  bucket="backlog"
-                  column="inbox"
-                  detailed
-                />
-              ))}
-            </ul>
-          </SortableContext>
+          <>
+            <div className="flex items-center justify-between px-1 pb-1.5">
+              <span className="text-[11px] font-semibold text-muted">
+                Unscheduled
+              </span>
+              <span className="text-[10px] tabular-nums text-faint">
+                {tasks.length}
+              </span>
+            </div>
+            <SortableContext
+              items={tasks.map((task) => task.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <ul className="overflow-hidden rounded-lg border border-hairline bg-surface-raised shadow-[0_1px_2px_rgba(0,0,0,0.025)] divide-y divide-soft/70">
+                {tasks.map((task) => (
+                  <TaskItem
+                    key={task.id}
+                    task={task}
+                    bucket="backlog"
+                    column="inbox"
+                    variant="inbox"
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </>
         )}
-        <div className="mt-1 px-0.5">
-          <AddTask placeholder="+ add to inbox" onAdd={addToBacklog} />
-        </div>
       </div>
-      <PanelSplitter
-        side="right"
-        width={width}
-        setWidth={setWidth}
-        defaultWidth={INBOX_DEFAULT_WIDTH}
-        onResizingChange={setResizing}
-      />
-    </aside>
+    </div>
   );
 }
 
-// The collapsible right-hand Timeline panel for the selected day. Resizable from
-// its left edge; width animates on collapse/expand, suppressed during live drag.
-function TimelinePanel({ preview }: { preview: DropPreview | null }) {
+// A persistent right inspector keeps time planning present without overlaying
+// the day canvas. Inbox is a peer tab in the same bounded workspace.
+function WorkspaceInspector({
+  tasks,
+  preview,
+}: {
+  tasks: Task[];
+  preview: DropPreview | null;
+}) {
   const selectedDate = usePlanner((s) => s.selectedDate);
-  const collapsed = usePlanner((s) => s.timelineCollapsed);
-  const toggle = usePlanner((s) => s.toggleTimeline);
-  const width = usePlanner((s) => s.timelineWidth);
-  const setWidth = usePlanner((s) => s.setTimelineWidth);
+  const collapsed = usePlanner((s) => s.inspectorCollapsed);
+  const toggle = usePlanner((s) => s.toggleInspector);
+  const tab = usePlanner((s) => s.inspectorTab);
+  const setTab = usePlanner((s) => s.setInspectorTab);
+  const width = usePlanner((s) => s.inspectorWidth);
+  const setWidth = usePlanner((s) => s.setInspectorWidth);
   const [resizing, setResizing] = useState(false);
 
   const rel = relativeLabel(selectedDate);
-  const label = rel ? `${rel} · ${prettyDate(selectedDate)}` : prettyDate(selectedDate);
+  const dateLabel = prettyDate(selectedDate);
+  const timelineLabel = rel ? `${rel} · ${dateLabel}` : dateLabel;
 
   if (collapsed) {
-    // A thin rail so the week strip gets full width; the chevron re-expands.
     return (
-      <aside className="flex w-7 shrink-0 flex-col items-center border-l border-soft bg-surface transition-[width] duration-[180ms] ease-out">
+      <aside className="flex w-9 shrink-0 flex-col items-center border-l border-soft bg-surface">
         <button
           onClick={toggle}
-          title="Expand timeline"
-          className="flex h-7 w-7 items-center justify-center text-muted hover:bg-accent-faint hover:text-text"
+          title="Open inspector"
+          className="relative flex h-[52px] w-full items-center justify-center text-muted hover:bg-accent-faint hover:text-text"
         >
-          ‹
+          {tab === "timeline" ? (
+            <CalendarClock className="h-4 w-4" />
+          ) : (
+            <Inbox className="h-4 w-4" />
+          )}
+          {tab === "inbox" && tasks.length > 0 && (
+            <span className="absolute right-1 top-2 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-accent px-1 text-[9px] font-semibold tabular-nums text-white">
+              {tasks.length > 99 ? "99+" : tasks.length}
+            </span>
+          )}
         </button>
       </aside>
     );
@@ -306,28 +301,77 @@ function TimelinePanel({ preview }: { preview: DropPreview | null }) {
   return (
     <aside
       style={{ width, transition: resizing ? "none" : undefined }}
-      className="relative flex shrink-0 flex-col border-l border-soft bg-surface transition-[width] duration-[180ms] ease-out"
+      className="relative flex min-h-0 shrink-0 flex-col border-l border-hairline bg-surface shadow-[-10px_0_24px_rgba(0,0,0,0.055)] transition-[width] duration-200 ease-out"
     >
       <PanelSplitter
         side="left"
         width={width}
         setWidth={setWidth}
-        defaultWidth={TIMELINE_DEFAULT_WIDTH}
+        defaultWidth={INSPECTOR_DEFAULT_WIDTH}
         onResizingChange={setResizing}
       />
-      <div className="flex items-center justify-between border-b border-soft px-2 py-1.5">
-        <h2 className="truncate text-[12px] font-medium text-text">{label}</h2>
+      <div className="flex h-[52px] shrink-0 items-stretch border-b border-soft">
+        <div role="tablist" aria-label="Inspector" className="flex min-w-0 flex-1">
+          <button
+            role="tab"
+            aria-selected={tab === "timeline"}
+            onClick={() => setTab("timeline")}
+            className={
+              "relative flex min-w-0 flex-1 items-center gap-2 px-3 text-left transition-colors " +
+              (tab === "timeline"
+                ? "bg-surface-raised text-text"
+                : "text-muted hover:bg-accent-faint hover:text-text")
+            }
+          >
+            <CalendarClock className="h-4 w-4 shrink-0" />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-semibold">Timeline</span>
+              <span className="block truncate text-[10px] font-normal text-muted">
+                {timelineLabel}
+              </span>
+            </span>
+            {tab === "timeline" && (
+              <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-accent" />
+            )}
+          </button>
+          <button
+            role="tab"
+            aria-selected={tab === "inbox"}
+            onClick={() => setTab("inbox")}
+            className={
+              "relative flex min-w-0 flex-1 items-center gap-2 px-3 text-left transition-colors " +
+              (tab === "inbox"
+                ? "bg-surface-raised text-text"
+                : "text-muted hover:bg-accent-faint hover:text-text")
+            }
+          >
+            <Inbox className="h-4 w-4 shrink-0" />
+            <span className="min-w-0">
+              <span className="block text-[12px] font-semibold">Inbox</span>
+              <span className="block text-[10px] font-normal text-muted">
+                {tasks.length} {tasks.length === 1 ? "item" : "items"}
+              </span>
+            </span>
+            {tab === "inbox" && (
+              <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-accent" />
+            )}
+          </button>
+        </div>
         <button
           onClick={toggle}
-          title="Collapse timeline"
-          className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-accent-faint hover:text-text"
+          title="Collapse inspector"
+          className="flex w-8 shrink-0 items-center justify-center text-muted hover:bg-accent-faint hover:text-text"
         >
-          ›
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto px-3 py-2">
-        <Timeline preview={preview} />
-      </div>
+      {tab === "timeline" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+          <Timeline preview={preview} />
+        </div>
+      ) : (
+        <InboxInspectorContent tasks={tasks} />
+      )}
     </aside>
   );
 }
@@ -377,19 +421,31 @@ export function PlannerShell() {
   const altRef = useRef(false);
 
   const scrollToToday = () => {
-    const el = stripRef.current?.querySelector<HTMLElement>(
+    const strip = stripRef.current;
+    const el = strip?.querySelector<HTMLElement>(
       `[data-day="${todayKey()}"]`,
     );
-    el?.scrollIntoView({ inline: "start", block: "nearest" });
+    if (!strip || !el) return;
+    strip.scrollLeft = el.offsetLeft;
   };
 
-  // Bring a given day column into view (best-effort: a key outside the loaded
-  // strip simply finds nothing, which is harmless).
+  // Bring a given day column into the WEEK STRIP only. `scrollIntoView` also
+  // scrolls ancestor viewports, which can shift the whole shell and clip its
+  // permanent rails even when the document uses overflow:hidden.
   const scrollDayIntoView = (key: string) => {
-    const el = stripRef.current?.querySelector<HTMLElement>(
+    const strip = stripRef.current;
+    const el = strip?.querySelector<HTMLElement>(
       `[data-day="${key}"]`,
     );
-    el?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    if (!strip || !el) return;
+
+    const dayStart = el.offsetLeft;
+    const dayEnd = dayStart + el.offsetWidth;
+    const viewStart = strip.scrollLeft;
+    const viewEnd = viewStart + strip.clientWidth;
+
+    if (dayStart < viewStart) strip.scrollLeft = dayStart;
+    else if (dayEnd > viewEnd) strip.scrollLeft = dayEnd - strip.clientWidth;
   };
 
   // The single visible window for the selected day's timeline, grown to enclose
@@ -664,65 +720,71 @@ export function PlannerShell() {
           buttons are normal interactive children and stay clickable. */}
       <header
         data-tauri-drag-region
-        className="flex h-9 shrink-0 items-center justify-end gap-1.5 border-b border-soft bg-surface px-3"
+        className="relative flex h-12 shrink-0 items-center justify-end border-b border-soft bg-surface/95 pl-[78px] pr-3"
       >
-        <button
-          onClick={() => focusDayStartId != null && openFocus(focusDayStartId)}
-          disabled={focusDayStartId == null}
-          title={
-            focusDayStartId != null
-              ? "Focus today's scheduled tasks one at a time"
-              : "Plan a task on the timeline to focus your day"
-          }
-          className={
-            // The one primary button carries the accent (filled), at rest.
-            "rounded px-2 py-0.5 text-[12px] font-semibold " +
-            (focusDayStartId != null
-              ? "bg-accent text-white hover:bg-accent-strong"
-              : "cursor-default text-faint")
-          }
-        >
-          ▶ Focus day
-        </button>
-        <button
-          onClick={() => {
-            if (!isToday) setDate(todayKey());
-            scrollToToday();
-          }}
-          className="rounded px-2 py-0.5 text-[12px] text-muted hover:bg-accent-faint hover:text-text"
-        >
-          Jump to today
-        </button>
-        {/* Compact segmented Week | Day control. The active segment carries an
-            accent fill; the inactive one stays quiet (muted, hover affordance).
-            Picks the middle-region layout; selectedDate still drives WHICH day. */}
-        <div className="flex items-center overflow-hidden rounded border border-soft">
-          <button
-            onClick={() => setViewMode("week")}
-            title="Show the week strip"
-            className={
-              "px-2 py-0.5 text-[12px] font-medium " +
-              (viewMode === "week"
-                ? "bg-accent text-white"
-                : "text-muted hover:bg-accent-faint hover:text-text")
-            }
-          >
-            Week
-          </button>
-          <button
-            onClick={() => setViewMode("day")}
-            title="Expand the selected day"
-            className={
-              "px-2 py-0.5 text-[12px] font-medium " +
-              (viewMode === "day"
-                ? "bg-accent text-white"
-                : "text-muted hover:bg-accent-faint hover:text-text")
-            }
-          >
-            Day
-          </button>
+        <div className="pointer-events-none absolute inset-x-0 text-center text-[13px] font-semibold text-text">
+          {monthYear(selectedDate)}
         </div>
-        <ThemePicker />
+        <div className="relative z-10 flex items-center gap-1">
+          <button
+            onClick={() => focusDayStartId != null && openFocus(focusDayStartId)}
+            disabled={focusDayStartId == null}
+            title={
+              focusDayStartId != null
+                ? "Focus today's scheduled tasks one at a time"
+                : "Plan a task on the timeline to focus your day"
+            }
+            className={
+              // The one primary button carries the accent (filled), at rest.
+              "inline-flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium " +
+              (focusDayStartId != null
+                ? "bg-accent text-white hover:bg-accent-strong"
+                : "cursor-default text-faint")
+            }
+          >
+            <Play className="h-3.5 w-3.5" />
+            Focus
+          </button>
+          <button
+            onClick={() => {
+              if (!isToday) setDate(todayKey());
+              scrollToToday();
+            }}
+            className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] text-muted hover:bg-soft hover:text-text"
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            Today
+          </button>
+          <div className="flex h-7 items-center rounded-md bg-soft p-0.5 shadow-[inset_0_0_0_1px_var(--color-hairline)]">
+            <button
+              onClick={() => setViewMode("week")}
+              title="Show the week strip"
+              className={
+                "inline-flex h-6 items-center gap-1 rounded-[5px] px-2.5 text-[12px] font-medium " +
+                (viewMode === "week"
+                  ? "bg-surface-raised text-text shadow-sm"
+                  : "text-muted hover:text-text")
+              }
+            >
+              <CalendarDays className="h-3.5 w-3.5" />
+              Week
+            </button>
+            <button
+              onClick={() => setViewMode("day")}
+              title="Expand the selected day"
+              className={
+                "inline-flex h-6 items-center gap-1 rounded-[5px] px-2.5 text-[12px] font-medium " +
+                (viewMode === "day"
+                  ? "bg-surface-raised text-text shadow-sm"
+                  : "text-muted hover:text-text")
+              }
+            >
+              <CalendarClock className="h-3.5 w-3.5" />
+              Day
+            </button>
+          </div>
+          <ThemePicker />
+        </div>
       </header>
 
       <DndContext
@@ -735,16 +797,13 @@ export function PlannerShell() {
       >
         <InsertionContext.Provider value={insertion}>
         <TimelineWindowContext.Provider value={timelineWindow}>
-        <div className="flex flex-1 overflow-hidden">
-          {/* LEFT: pinned Inbox (outside the horizontal scroll). */}
-          <InboxColumn tasks={backlog} />
-
+        <div className="relative isolate flex min-h-0 flex-1 overflow-hidden">
           {/* MIDDLE: either the horizontally scrolling week strip (anchored on
               today) or a single expanded column for the selected day. Both stay
               inside this DndContext; the Inbox and Timeline are unchanged in
               both modes. */}
           {viewMode === "day" ? (
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto bg-surface-raised">
               <div className="mx-auto w-full max-w-2xl px-4 py-4">
                 <DayColumn
                   date={selectedDate}
@@ -756,13 +815,13 @@ export function PlannerShell() {
           ) : (
             <div
               ref={stripRef}
-              className="flex-1 overflow-x-auto overflow-y-hidden"
+              className="week-strip min-h-0 flex-1 overflow-x-auto overflow-y-hidden bg-surface-raised"
               onScroll={onScroll}
             >
               {weekLoading && weekDays.length === 0 ? (
                 <p className="px-4 py-3 text-[13px] text-muted">Loading…</p>
               ) : (
-                <div className="flex h-full min-w-max">
+                <div className="week-strip-track flex h-full w-full">
                   {weekDays.map((date) => (
                     <DayColumn
                       key={date}
@@ -775,8 +834,8 @@ export function PlannerShell() {
             </div>
           )}
 
-          {/* RIGHT: collapsible Timeline panel for the selected day. */}
-          <TimelinePanel preview={preview} />
+          {/* RIGHT: persistent, tabbed Timeline / Inbox inspector. */}
+          <WorkspaceInspector tasks={backlog} preview={preview} />
         </div>
         </TimelineWindowContext.Provider>
         </InsertionContext.Provider>

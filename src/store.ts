@@ -11,6 +11,7 @@ import { dayRange, shiftDay, todayKey } from "./lib/date";
 import { timeToMinutes } from "./lib/timeline";
 import * as prefs from "./lib/prefs";
 import { DEFAULT_THEME, applyTheme, normalizeTheme } from "./lib/themes";
+import { reconcileTaskProjection } from "./lib/taskProjection";
 
 type Bucket = "day" | "backlog";
 
@@ -19,6 +20,7 @@ type Bucket = "day" | "backlog";
 // the source of truth for WHICH day; this only picks the layout. Persisted to
 // localStorage like the other view-chrome prefs.
 export type ViewMode = "week" | "day";
+export type InspectorTab = "timeline" | "inbox";
 
 // Pomodoro is a fixed rhythm, not a configurable timer app: a 25 minute work
 // block followed by a 5 minute break, auto-advancing work -> break -> work.
@@ -58,15 +60,10 @@ async function notify(title: string, body: string): Promise<void> {
   }
 }
 
-// Side-panel UI preferences (single device, persisted in localStorage, not
-// SQLite). Defaults match the panels' previous hardcoded widths so existing
-// users see no jump on first load. Widths are clamped on every write.
-export const INBOX_DEFAULT_WIDTH = 224; // was w-56
-export const TIMELINE_DEFAULT_WIDTH = 300; // was w-[300px]
-const INBOX_MIN_WIDTH = 200;
-const INBOX_MAX_WIDTH = 420;
-const TIMELINE_MIN_WIDTH = 240;
-const TIMELINE_MAX_WIDTH = 520;
+// Persistent inspector preferences (single device, localStorage only).
+export const INSPECTOR_DEFAULT_WIDTH = 320;
+const INSPECTOR_MIN_WIDTH = 300;
+const INSPECTOR_MAX_WIDTH = 420;
 
 const clamp = (px: number, min: number, max: number) =>
   Math.max(min, Math.min(max, Math.round(px)));
@@ -78,6 +75,10 @@ const clamp = (px: number, min: number, max: number) =>
 const WEEK_PAST_DAYS = 7; // days before today included in the initial window
 const WEEK_INITIAL_DAYS = 7 + 15; // 7 past + today + ~14 ahead
 const WEEK_EXTEND_DAYS = 7;
+
+let refreshRequestSeq = 0;
+let loadWeekRequestSeq = 0;
+let weekProjectionVersion = 0;
 
 // Apply `fields` to the matching task wherever it appears in the week map,
 // returning a new map. Pure. In-place edits only (does not relocate rows
@@ -192,16 +193,29 @@ function buildFocusQueue(
   return { queue, index };
 }
 
-interface PlannerState {
-  // Left-hand Inbox panel collapse state. Mirrors the Timeline collapse: a thin
-  // rail when collapsed, full panel when expanded. Persisted to localStorage.
-  inboxCollapsed: boolean;
-  toggleInbox: () => void;
+function collectRunningTaskIds(
+  s: Pick<PlannerState, "dayTasks" | "backlog" | "carryOver" | "weekTasks">,
+): number[] {
+  const ids = new Set<number>();
+  const visit = (task: Task) => {
+    if (task.timer_started_at) ids.add(task.id);
+  };
+  for (const task of s.dayTasks) visit(task);
+  for (const task of s.backlog) visit(task);
+  for (const task of s.carryOver) visit(task);
+  for (const key of Object.keys(s.weekTasks)) {
+    for (const task of s.weekTasks[key]) visit(task);
+  }
+  return [...ids];
+}
 
-  // Right-hand Timeline panel collapse state. The week strip takes the full
-  // width when collapsed; default is expanded. Persisted to localStorage.
-  timelineCollapsed: boolean;
-  toggleTimeline: () => void;
+interface PlannerState {
+  // Persistent right inspector. Timeline is the default tab; Inbox is a peer.
+  inspectorCollapsed: boolean;
+  toggleInspector: () => void;
+
+  inspectorTab: InspectorTab;
+  setInspectorTab: (tab: InspectorTab) => void;
 
   // Middle-region layout: "week" strip or single expanded "day". Persisted.
   viewMode: ViewMode;
@@ -213,11 +227,8 @@ interface PlannerState {
   theme: string;
   setTheme: (id: string) => void;
 
-  // Persisted panel widths (px). Setters clamp to each panel's allowed range.
-  inboxWidth: number;
-  setInboxWidth: (px: number) => void;
-  timelineWidth: number;
-  setTimelineWidth: (px: number) => void;
+  inspectorWidth: number;
+  setInspectorWidth: (px: number) => void;
 
   selectedDate: string;
   dayTasks: Task[];
@@ -231,7 +242,7 @@ interface PlannerState {
   weekDays: string[];
   weekTasks: Record<string, Task[]>;
   weekLoading: boolean;
-  // Load the initial window (today .. +N days) and the backlog.
+  // Load the initial week window (today .. +N days).
   loadWeek: () => Promise<void>;
   // Append more future days to the right and load their tasks.
   extendWeek: (extraDays?: number) => Promise<void>;
@@ -245,6 +256,7 @@ interface PlannerState {
 
   // Task detail modal
   detailTaskId: number | null;
+  detailTask: Task | null;
   detailComments: Comment[];
   detailSubtasks: Subtask[];
   detailAttachments: Attachment[];
@@ -286,6 +298,7 @@ interface PlannerState {
   advancePomodoroIfDue: () => Promise<void>;
 
   refresh: () => Promise<void>;
+  syncTaskFromDb: (id: number) => Promise<void>;
   setDate: (date: string) => Promise<void>;
   // Patch a task in memory immediately, then run `persist` in the background.
   applyOptimistic: (
@@ -336,8 +349,9 @@ async function advancePomodoro(
   if (!pomodoro.active) return;
   if (pomodoro.phase === "work") {
     // work -> break: fold the work minutes, then go idle for the break.
+    const runningIds = collectRunningTaskIds(get());
     await repo.stopRunningTimers();
-    await get().refresh();
+    await Promise.all(runningIds.map((id) => get().syncTaskFromDb(id)));
     set({
       pomodoro: {
         active: true,
@@ -349,8 +363,10 @@ async function advancePomodoro(
     void notify("Break time", "Step away for 5 min");
   } else {
     // break -> work: start a fresh work block (timer running again).
-    if (focusTaskId != null) await repo.startTimer(focusTaskId);
-    await get().refresh();
+    if (focusTaskId != null) {
+      await repo.startTimer(focusTaskId);
+      await get().syncTaskFromDb(focusTaskId);
+    }
     set({
       pomodoro: {
         active: true,
@@ -366,21 +382,22 @@ async function advancePomodoro(
 export const usePlanner = create<PlannerState>((set, get) => ({
   // UI prefs: read initial values from localStorage (defaults when absent),
   // write back on every toggle/set so they survive reloads on this device.
-  inboxCollapsed: prefs.readBool("inboxCollapsed", false),
-  toggleInbox: () =>
+  inspectorCollapsed: prefs.readBool("workspaceInspectorCollapsed", false),
+  toggleInspector: () =>
     set((s) => {
-      const next = !s.inboxCollapsed;
-      prefs.write("inboxCollapsed", next);
-      return { inboxCollapsed: next };
+      const next = !s.inspectorCollapsed;
+      prefs.write("workspaceInspectorCollapsed", next);
+      return { inspectorCollapsed: next };
     }),
 
-  timelineCollapsed: prefs.readBool("timelineCollapsed", false),
-  toggleTimeline: () =>
-    set((s) => {
-      const next = !s.timelineCollapsed;
-      prefs.write("timelineCollapsed", next);
-      return { timelineCollapsed: next };
-    }),
+  inspectorTab:
+    prefs.readString("inspectorTab", "timeline") === "inbox"
+      ? "inbox"
+      : "timeline",
+  setInspectorTab: (tab) => {
+    prefs.write("inspectorTab", tab);
+    set({ inspectorTab: tab });
+  },
 
   // Coerce the stored string to one of the two valid modes (anything else, e.g.
   // a stale or absent value, falls back to "week").
@@ -399,26 +416,15 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     set({ theme: next });
   },
 
-  inboxWidth: clamp(
-    prefs.readNumber("inboxWidth", INBOX_DEFAULT_WIDTH),
-    INBOX_MIN_WIDTH,
-    INBOX_MAX_WIDTH,
+  inspectorWidth: clamp(
+    prefs.readNumber("inspectorWidth", INSPECTOR_DEFAULT_WIDTH),
+    INSPECTOR_MIN_WIDTH,
+    INSPECTOR_MAX_WIDTH,
   ),
-  setInboxWidth: (px) => {
-    const next = clamp(px, INBOX_MIN_WIDTH, INBOX_MAX_WIDTH);
-    prefs.write("inboxWidth", next);
-    set({ inboxWidth: next });
-  },
-
-  timelineWidth: clamp(
-    prefs.readNumber("timelineWidth", TIMELINE_DEFAULT_WIDTH),
-    TIMELINE_MIN_WIDTH,
-    TIMELINE_MAX_WIDTH,
-  ),
-  setTimelineWidth: (px) => {
-    const next = clamp(px, TIMELINE_MIN_WIDTH, TIMELINE_MAX_WIDTH);
-    prefs.write("timelineWidth", next);
-    set({ timelineWidth: next });
+  setInspectorWidth: (px) => {
+    const next = clamp(px, INSPECTOR_MIN_WIDTH, INSPECTOR_MAX_WIDTH);
+    prefs.write("inspectorWidth", next);
+    set({ inspectorWidth: next });
   },
 
   selectedDate: todayKey(),
@@ -432,6 +438,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   weekLoading: true,
 
   detailTaskId: null,
+  detailTask: null,
   detailComments: [],
   detailSubtasks: [],
   detailAttachments: [],
@@ -442,13 +449,16 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   pomodoro: POMODORO_INACTIVE,
 
   openDetail: async (id) => {
+    const inMemoryTask = findTaskAnywhere(get(), id) ?? null;
     set({
       detailTaskId: id,
+      detailTask: inMemoryTask,
       detailComments: [],
       detailSubtasks: [],
       detailAttachments: [],
     });
-    const [comments, subtasks, attachments] = await Promise.all([
+    const [task, comments, subtasks, attachments] = await Promise.all([
+      repo.fetchTaskById(id),
       repo.fetchComments(id),
       repo.fetchSubtasks(id),
       repo.fetchAttachments(id),
@@ -456,6 +466,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     // Ignore if the modal was closed/switched while loading.
     if (get().detailTaskId === id)
       set({
+        detailTask: task ?? inMemoryTask,
         detailComments: comments,
         detailSubtasks: subtasks,
         detailAttachments: attachments,
@@ -465,6 +476,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   closeDetail: () =>
     set({
       detailTaskId: null,
+      detailTask: null,
       detailComments: [],
       detailSubtasks: [],
       detailAttachments: [],
@@ -488,21 +500,26 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     if (id == null) return;
     await repo.addSubtask(id, title);
     set({ detailSubtasks: await repo.fetchSubtasks(id) });
-    await get().refresh(); // update row progress chip
+    await get().syncTaskFromDb(id);
   },
 
   toggleSubtask: async (sub) => {
     await repo.setSubtaskDone(sub.id, !sub.done);
-    const id = get().detailTaskId;
-    if (id != null) set({ detailSubtasks: await repo.fetchSubtasks(id) });
-    await get().refresh();
+    const detailId = get().detailTaskId;
+    if (detailId === sub.task_id)
+      set({ detailSubtasks: await repo.fetchSubtasks(sub.task_id) });
+    const focusId = get().focusTaskId;
+    if (focusId === sub.task_id)
+      set({ focusSubtasks: await repo.fetchSubtasks(sub.task_id) });
+    await get().syncTaskFromDb(sub.task_id);
   },
 
   deleteSubtask: async (subId) => {
-    await repo.deleteSubtask(subId);
     const id = get().detailTaskId;
-    if (id != null) set({ detailSubtasks: await repo.fetchSubtasks(id) });
-    await get().refresh();
+    if (id == null) return;
+    await repo.deleteSubtask(subId);
+    set({ detailSubtasks: await repo.fetchSubtasks(id) });
+    await get().syncTaskFromDb(id);
   },
 
   addAttachments: async (srcPaths) => {
@@ -528,7 +545,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     }
     if (get().detailTaskId === id)
       set({ detailAttachments: await repo.fetchAttachments(id) });
-    await get().refresh(); // update the card attachment_count chip
+    await get().syncTaskFromDb(id);
   },
 
   deleteAttachment: async (attId) => {
@@ -544,13 +561,14 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     await repo.deleteAttachment(attId);
     const id = get().detailTaskId;
     if (id != null) set({ detailAttachments: await repo.fetchAttachments(id) });
-    await get().refresh();
+    if (id != null) await get().syncTaskFromDb(id);
   },
 
   openFocus: async (id) => {
     // Stop any prior session so its elapsed time is folded in exactly once,
     // then start the timer on the new task. startTimer also stops others, but we
     // call stop explicitly to make the "fold once" contract clear.
+    const runningIds = collectRunningTaskIds(get());
     await repo.stopRunningTimers();
     await repo.startTimer(id);
     // Optimistically mark the new task as running so the emerald dot shows
@@ -579,14 +597,17 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     const subtasks = await repo.fetchSubtasks(id);
     // Ignore if focus was closed/switched while loading.
     if (get().focusTaskId === id) set({ focusSubtasks: subtasks });
-    // Reconcile actual_minutes / timer state from disk (a prior running task
-    // gets its folded time, and timer_started_at gets its canonical value).
-    await get().refresh();
+    await Promise.all(
+      [...new Set([...runningIds, id])].map((taskId) =>
+        get().syncTaskFromDb(taskId),
+      ),
+    );
   },
 
   closeFocus: async () => {
+    const runningIds = collectRunningTaskIds(get());
     await repo.stopRunningTimers();
-    await get().refresh();
+    await Promise.all(runningIds.map((id) => get().syncTaskFromDb(id)));
     // Leaving focus also clears pomodoro so it never runs without a focused task.
     set({ focusTaskId: null, focusSubtasks: [], pomodoro: POMODORO_INACTIVE });
   },
@@ -647,7 +668,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     await repo.setSubtaskDone(sub.id, !sub.done);
     const id = get().focusTaskId;
     if (id != null) set({ focusSubtasks: await repo.fetchSubtasks(id) });
-    await get().refresh(); // update the card progress chip
+    await get().syncTaskFromDb(sub.task_id);
   },
 
   // Enter the pomodoro rhythm on the focused task: begin a WORK block. Ensures
@@ -658,7 +679,10 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     if (id == null) return;
     // WORK = timer running; make sure it is.
     const task = findTaskAnywhere(get(), id);
-    if (task && !task.timer_started_at) await repo.startTimer(id);
+    if (task && !task.timer_started_at) {
+      await repo.startTimer(id);
+      await get().syncTaskFromDb(id);
+    }
     set({
       pomodoro: {
         active: true,
@@ -683,7 +707,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     const { pomodoro, focusTaskId } = get();
     if (pomodoro.phase === "break" && focusTaskId != null) {
       await repo.startTimer(focusTaskId);
-      await get().refresh();
+      await get().syncTaskFromDb(focusTaskId);
     }
     set({ pomodoro: POMODORO_INACTIVE });
   },
@@ -695,8 +719,9 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     if (!pomodoro.active || pomodoro.pausedRemainingMs != null) return;
     const remaining = Math.max(0, (pomodoro.phaseEndsAt ?? Date.now()) - Date.now());
     if (pomodoro.phase === "work") {
+      const runningIds = collectRunningTaskIds(get());
       await repo.stopRunningTimers();
-      await get().refresh();
+      await Promise.all(runningIds.map((id) => get().syncTaskFromDb(id)));
     }
     set({
       pomodoro: { ...pomodoro, phaseEndsAt: null, pausedRemainingMs: remaining },
@@ -710,6 +735,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     if (!pomodoro.active || pomodoro.pausedRemainingMs == null) return;
     if (pomodoro.phase === "work" && focusTaskId != null) {
       await repo.startTimer(focusTaskId);
+      await get().syncTaskFromDb(focusTaskId);
     }
     set({
       pomodoro: {
@@ -740,14 +766,46 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     await advancePomodoro(get, set);
   },
 
+  syncTaskFromDb: async (id) => {
+    // Any older broad refresh began before this canonical mutation result and
+    // must not overwrite it when its slower query completes.
+    refreshRequestSeq += 1;
+    const task = await repo.fetchTaskById(id);
+    weekProjectionVersion += 1;
+    set((s) => ({
+      ...reconcileTaskProjection({
+        selectedDate: s.selectedDate,
+        dayTasks: s.dayTasks,
+        backlog: s.backlog,
+        carryOver: s.carryOver,
+        weekTasks: s.weekTasks,
+        taskId: id,
+        task,
+        todayKey: todayKey(),
+      }),
+      ...(s.detailTaskId === id ? { detailTask: task ?? null } : {}),
+    }));
+  },
+
   refresh: async () => {
+    const requestId = ++refreshRequestSeq;
     const date = get().selectedDate;
     const [dayTasks, backlog, carryOver] = await Promise.all([
       repo.fetchTasksForDate(date),
       repo.fetchBacklog(),
       repo.fetchCarryOver(todayKey()),
     ]);
-    set({ dayTasks, backlog, carryOver, loading: false });
+    if (requestId !== refreshRequestSeq || get().selectedDate !== date) return;
+    weekProjectionVersion += 1;
+    set((s) => ({
+      dayTasks,
+      backlog,
+      carryOver,
+      weekTasks: Object.prototype.hasOwnProperty.call(s.weekTasks, date)
+        ? { ...s.weekTasks, [date]: dayTasks }
+        : s.weekTasks,
+      loading: false,
+    }));
   },
 
   setDate: async (date) => {
@@ -764,13 +822,20 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   },
 
   loadWeek: async () => {
+    const requestId = ++loadWeekRequestSeq;
     const days = dayRange(shiftDay(todayKey(), -WEEK_PAST_DAYS), WEEK_INITIAL_DAYS);
     set({ weekDays: days, weekLoading: true });
-    const [rows, backlog] = await Promise.all([
-      repo.fetchTasksForRange(days[0], days[days.length - 1]),
-      repo.fetchBacklog(),
-    ]);
-    set({ weekTasks: groupByDay(rows, days), backlog, weekLoading: false });
+    while (requestId === loadWeekRequestSeq) {
+      const projectionVersion = weekProjectionVersion;
+      const rows = await repo.fetchTasksForRange(days[0], days[days.length - 1]);
+      if (requestId !== loadWeekRequestSeq) return;
+      // A task mutation landed while this range query was in flight. Query the
+      // range again rather than replacing the reconciled projection with the
+      // older snapshot.
+      if (projectionVersion !== weekProjectionVersion) continue;
+      set({ weekTasks: groupByDay(rows, days), weekLoading: false });
+      return;
+    }
   },
 
   extendWeek: async (extraDays = WEEK_EXTEND_DAYS) => {
@@ -781,7 +846,12 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     }
     const start = shiftDay(current[current.length - 1], 1);
     const added = dayRange(start, extraDays);
-    const rows = await repo.fetchTasksForRange(added[0], added[added.length - 1]);
+    let rows: Task[];
+    while (true) {
+      const projectionVersion = weekProjectionVersion;
+      rows = await repo.fetchTasksForRange(added[0], added[added.length - 1]);
+      if (projectionVersion === weekProjectionVersion) break;
+    }
     const grouped = groupByDay(rows, added);
     set({
       weekDays: [...current, ...added],
@@ -844,6 +914,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
         id,
         fields as Record<string, string | number | null>,
       );
+      await get().syncTaskFromDb(id);
     } catch (err) {
       console.error("Week move failed; rolling back", err);
       set({
@@ -858,6 +929,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     await repo.insertTask({ title, plannedDate: date });
     // Reload just this day's column and the day view if it is showing `date`.
     const rows = await repo.fetchTasksForRange(date, date);
+    weekProjectionVersion += 1;
     set({ weekTasks: { ...get().weekTasks, [date]: rows } });
     if (get().selectedDate === date) await get().refresh();
   },
@@ -868,24 +940,29 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   // drop flash). On failure, roll back to the pre-mutation snapshot and reload
   // the truth from disk.
   applyOptimistic: async (id, fields, persist) => {
+    refreshRequestSeq += 1;
     const before: TaskBuckets = {
       dayTasks: get().dayTasks,
       backlog: get().backlog,
       carryOver: get().carryOver,
     };
     const beforeWeek = get().weekTasks;
+    const beforeDetailTask = get().detailTask;
     // Patch the day buckets and the week map in place so both views show the
     // edit on the next render. This handles in-place edits (complete, estimate,
     // schedule); cross-column moves use moveTaskWeek to relocate rows.
     set({
       ...patchTaskInBuckets(before, id, fields),
       weekTasks: patchTaskInWeek(beforeWeek, id, fields),
+      ...(beforeDetailTask?.id === id
+        ? { detailTask: { ...beforeDetailTask, ...fields } }
+        : {}),
     });
     try {
       await persist();
     } catch (err) {
       console.error("Optimistic update failed; rolling back", err);
-      set({ ...before, weekTasks: beforeWeek });
+      set({ ...before, weekTasks: beforeWeek, detailTask: beforeDetailTask });
       await get().refresh();
     }
   },
@@ -907,16 +984,19 @@ export const usePlanner = create<PlannerState>((set, get) => ({
   editTask: async (id, fields) => {
     // Patch in place first so edits that change visible geometry (e.g. a block
     // resize committing estimate_minutes) take effect on the next render with no
-    // revert-then-snap. Refresh afterwards to reconcile derived data (subtask
-    // chips) and any list membership the edit may affect.
+    // revert-then-snap. Canonical sync after persist reconciles derived data and
+    // list membership.
     await get().applyOptimistic(id, fields as Partial<Task>, async () => {
       await repo.updateTask(id, fields);
-      await get().refresh();
+      await get().syncTaskFromDb(id);
     });
   },
 
   editTaskQuiet: async (id, fields) => {
-    await repo.updateTask(id, fields);
+    await get().applyOptimistic(id, fields as Partial<Task>, async () => {
+      await repo.updateTask(id, fields);
+      await get().syncTaskFromDb(id);
+    });
   },
 
   toggleComplete: async (task) => {
@@ -926,13 +1006,14 @@ export const usePlanner = create<PlannerState>((set, get) => ({
         status: (task.planned_date ? "planned" : "backlog") as Task["status"],
         completed_at: null,
       };
-      await get().applyOptimistic(task.id, fields, () =>
-        repo.updateTask(task.id, fields),
-      );
+      await get().applyOptimistic(task.id, fields, async () => {
+        await repo.updateTask(task.id, fields);
+        await get().syncTaskFromDb(task.id);
+      });
     } else {
       // Completing also stops a running timer so the actual time is captured.
-      // The stored actual_minutes is recomputed in SQL, so refresh afterwards to
-      // pick up the folded-in elapsed time (only when a timer was running).
+      // The stored actual_minutes is recomputed in SQL, then canonical sync
+      // reconciles timer + derived values across projections.
       const wasRunning = !!task.timer_started_at;
       const fields = {
         status: "done" as Task["status"],
@@ -945,7 +1026,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
           status: fields.status,
           completed_at: fields.completed_at,
         });
-        if (wasRunning) await get().refresh();
+        await get().syncTaskFromDb(task.id);
       });
     }
   },
@@ -962,7 +1043,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     } catch (err) {
       console.error("Attachment dir cleanup failed", err);
     }
-    await get().refresh();
+    await get().syncTaskFromDb(id);
   },
 
   reorder: async (_bucket, orderedIds) => {
@@ -993,6 +1074,20 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     });
     try {
       await repo.reorderTasks(orderedIds);
+      weekProjectionVersion += 1;
+      // A range load may have completed during persistence. Reapply the known
+      // order to the latest projections so the optimistic result remains true.
+      set((s) => {
+        const weekTasks: Record<string, Task[]> = {};
+        for (const key of Object.keys(s.weekTasks)) {
+          weekTasks[key] = sortByOrder(s.weekTasks[key]);
+        }
+        return {
+          dayTasks: sortByOrder(s.dayTasks),
+          backlog: sortByOrder(s.backlog),
+          weekTasks,
+        };
+      });
     } catch (err) {
       console.error("Reorder failed; rolling back", err);
       set({ ...before, weekTasks: beforeWeek });
@@ -1008,12 +1103,10 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     // Moving back to the backlog clears any timeline placement.
     if (!toDate) fields.scheduled_start = null;
     // Cross-bucket move: the optimistic patch updates the row's fields in place,
-    // but the row needs to appear in the other bucket too. Persist then refresh
-    // so it lands in the right list; the patch keeps the moment-of-drop frame
-    // consistent (no stale status flicker) while the reload completes.
+    // then canonical sync places it in the right projections after persistence.
     await get().applyOptimistic(id, fields, async () => {
       await repo.updateTask(id, fields as Record<string, string | number | null>);
-      await get().refresh();
+      await get().syncTaskFromDb(id);
     });
   },
 
@@ -1030,16 +1123,9 @@ export const usePlanner = create<PlannerState>((set, get) => ({
     };
     // A backlog task pulled onto the timeline becomes a planned task.
     if (task?.status === "backlog") fields.status = "planned";
-    // If the task already lives on the selected day (the common case: moving an
-    // existing block), the optimistic patch alone puts it at its final slot, so
-    // no reload is needed and the block never flashes at its old position.
-    // A task arriving from the backlog or another day must also move buckets, so
-    // reload after persisting to land it in dayTasks.
-    const needsReload =
-      !task || task.planned_date !== selectedDate;
     await get().applyOptimistic(id, fields, async () => {
       await repo.updateTask(id, fields as Record<string, string | number | null>);
-      if (needsReload) await get().refresh();
+      await get().syncTaskFromDb(id);
     });
   },
 
@@ -1114,33 +1200,40 @@ export const usePlanner = create<PlannerState>((set, get) => ({
         id,
         fields as Record<string, string | number | null>,
       );
+      await get().syncTaskFromDb(id);
     } catch (err) {
       console.error("Schedule on selected failed; rolling back", err);
       set({ ...before, backlog: beforeBacklog, weekTasks: beforeWeek });
-      await get().refresh();
     }
   },
 
   unscheduleTask: async (id) => {
     // The task stays on the same day, just leaves the timeline. Patch in place,
-    // persist in the background; no reload needed.
-    await get().applyOptimistic(id, { scheduled_start: null }, () =>
-      repo.updateTask(id, { scheduled_start: null }),
-    );
+    // persist in the background, then reconcile from the canonical row.
+    await get().applyOptimistic(id, { scheduled_start: null }, async () => {
+      await repo.updateTask(id, { scheduled_start: null });
+      await get().syncTaskFromDb(id);
+    });
   },
 
   toggleTimer: async (task) => {
+    const runningIds = collectRunningTaskIds(get());
     if (task.timer_started_at) {
       await repo.stopRunningTimers();
+      await Promise.all(runningIds.map((id) => get().syncTaskFromDb(id)));
     } else {
       await repo.startTimer(task.id);
+      await Promise.all(
+        [...new Set([...runningIds, task.id])].map((id) =>
+          get().syncTaskFromDb(id),
+        ),
+      );
     }
-    await get().refresh();
   },
 
   setActual: async (id, minutes) => {
     await repo.updateTask(id, { actual_minutes: Math.max(0, Math.round(minutes)) });
-    await get().refresh();
+    await get().syncTaskFromDb(id);
   },
 
   moveToToday: async (id) => {
@@ -1149,7 +1242,7 @@ export const usePlanner = create<PlannerState>((set, get) => ({
       status: "planned",
       scheduled_start: null,
     });
-    await get().refresh();
+    await get().syncTaskFromDb(id);
   },
 
   moveAllToToday: async (ids) => {
@@ -1163,6 +1256,6 @@ export const usePlanner = create<PlannerState>((set, get) => ({
         }),
       ),
     );
-    await get().refresh();
+    await Promise.all(ids.map((id) => get().syncTaskFromDb(id)));
   },
 }));

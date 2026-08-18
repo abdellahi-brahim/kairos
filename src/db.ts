@@ -31,6 +31,15 @@ export async function fetchTasksForDate(date: string): Promise<Task[]> {
   );
 }
 
+export async function fetchTaskById(id: number): Promise<Task | undefined> {
+  const db = await getDb();
+  const rows = await db.select<Task[]>(
+    `SELECT ${COLUMNS}${SUBTASK_COUNTS} FROM tasks WHERE id = $1`,
+    [id],
+  );
+  return rows[0];
+}
+
 export async function fetchBacklog(): Promise<Task[]> {
   const db = await getDb();
   return db.select<Task[]>(

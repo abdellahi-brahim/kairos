@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Focus, GripVertical, ListChecks, Paperclip, Trash2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Subtask, Task } from "../types";
@@ -23,17 +24,16 @@ import { useInsertion } from "./InsertionContext";
 // (no notes, no metadata) stays a tight near-single-line row; the card only grows
 // as content requires.
 //
-// `detailed` mode (Day view only): the single wide column has room to breathe, so
-// the same card becomes richer - the full metadata footer shows AT REST (no hover
-// gating), the notes snippet runs longer, and existing subtasks render inline as a
-// checkable list. The default (strip/Inbox) mode is byte-for-byte unchanged: a
-// quiet two-item resting footer with the rest revealed on hover.
+// `detailed` mode (Day view only) reveals rich metadata and inline subtasks.
+// The Inbox variant stays height-stable inside its grouped queue and promotes
+// the estimate to the title line instead of expanding vertically on hover.
 export function TaskItem({
   task,
   bucket,
   column,
   onComplete,
   detailed = false,
+  variant = "default",
 }: {
   task: Task;
   bucket: "day" | "backlog";
@@ -49,14 +49,15 @@ export function TaskItem({
   // Day view only: render the roomier, always-expanded card (full footer at rest,
   // longer notes, inline checkable subtasks). Defaults to the calm strip card.
   detailed?: boolean;
+  // Inbox uses the same task object and interactions inside a grouped queue,
+  // with an inline estimate and a faint resting drag affordance.
+  variant?: "default" | "inbox";
 }) {
   const toggleComplete = usePlanner((s) => s.toggleComplete);
   const removeTask = usePlanner((s) => s.removeTask);
   const openDetail = usePlanner((s) => s.openDetail);
   const openFocus = usePlanner((s) => s.openFocus);
-  // Detailed mode persists an inline subtask toggle directly, then asks the store
-  // to reload the day buckets so the count stays consistent with disk.
-  const refresh = usePlanner((s) => s.refresh);
+  const toggleSubtaskInStore = usePlanner((s) => s.toggleSubtask);
 
   // JS-driven hover: WKWebView leaves CSS :hover stuck after a drag.
   const [hovered, setHovered] = useState(false);
@@ -85,6 +86,10 @@ export function TaskItem({
   const tags = parseTags(task.tags);
   const open = () => openDetail(task.id);
   const meta = priorityMeta(task.priority);
+  const inbox = variant === "inbox";
+  const dayCard = !detailed && !inbox;
+  const compact = inbox;
+  const inlineEstimate = inbox && task.estimate_minutes != null;
 
   // Notes are rich-text HTML (TipTap). Strip to plain text for a safe preview;
   // render the snippet only when there is actual text after stripping.
@@ -110,10 +115,9 @@ export function TaskItem({
     };
   }, [detailed, hasSubtasks, task.id]);
 
-  // Optimistically flip a subtask in the local list, persist, then refresh the
-  // day buckets so the store stays in sync. The progress chip reads the local
-  // list when it is loaded, so the count updates on the same render (flash-free)
-  // regardless of the refresh round-trip.
+  // Optimistically flip a subtask in the local list and persist via the store's
+  // canonical sync path. The progress chip reads the local list when loaded, so
+  // this updates instantly without waiting for round-trips.
   const toggleSubtask = (sub: Subtask) => {
     setSubtasks((prev) =>
       prev
@@ -122,7 +126,7 @@ export function TaskItem({
           )
         : prev,
     );
-    void repo.setSubtaskDone(sub.id, !sub.done).then(() => refresh());
+    void toggleSubtaskInStore(sub);
   };
 
   // Progress chip count: prefer the live local list (detailed mode, once loaded)
@@ -138,27 +142,164 @@ export function TaskItem({
   // attachments, extra tags) is revealed on hover, keeping the card serene at
   // rest. `hasRestMeta` controls whether the resting footer row exists at all.
   const restTag = tags[0];
-  const hasRestMeta = !!task.scheduled_start || running || !!restTag;
+  const hasRestMeta =
+    !!task.scheduled_start ||
+    task.estimate_minutes != null ||
+    running ||
+    !!restTag;
   // Extra metadata only worth showing once the card is hovered.
   const hasHoverExtra =
-    task.estimate_minutes != null ||
     task.actual_minutes > 0 ||
     hasSubtasks ||
     (!!task.attachment_count && task.attachment_count > 0) ||
     tags.length > 1;
-  // Detailed mode reveals the full footer at rest (no hover gating); the strip
-  // card keeps the quiet two-item resting row with the rest on hover.
-  const showExtras = detailed || hovered;
-  const showFooter = detailed
-    ? hasRestMeta || hasHoverExtra
-    : hasRestMeta || (hovered && hasHoverExtra);
+  // Inbox rows never gain vertical content on hover. Day cards use a stable
+  // metadata line at rest; rich content remains reserved for detailed Day view.
+  const showExtras = detailed;
+  const showFooter =
+    (detailed && (hasRestMeta || hasHoverExtra)) ||
+    (dayCard && hasRestMeta);
 
-  // Priority left rail: a 2px colored left border. border-left-color is more
-  // specific than the hover's generic border-color swap, so the rail color stays
-  // stable across hover. No rail for priority 0. At rest the card has NO border;
-  // hover brings the hairline + soft shadow in (single hover signal). The rail
-  // is the one resting border, so a prioritized card still reads as a unit.
+  // Priority left rail: a 2px colored left border. It is the only persistent
+  // edge on the otherwise flat list row.
   const railClass = task.priority > 0 ? " border-l-2 " + meta.rail : "";
+
+  if (dayCard) {
+    const hasDayMeta =
+      !!task.scheduled_start ||
+      !!restTag ||
+      hasSubtasks ||
+      running;
+
+    return (
+      <li
+        ref={setNodeRef}
+        style={style}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className={
+          "relative rounded-[4px] border bg-surface-raised px-3 py-2.5 shadow-[0_1px_2px_rgba(0,0,0,0.045)] transition-[border-color,box-shadow,transform] duration-150 ease-out " +
+          (hovered
+            ? "border-soft shadow-[0_3px_8px_rgba(0,0,0,0.08)]"
+            : "border-hairline")
+        }
+      >
+        {insertion && insertion.taskId === task.id && (
+          <span
+            className={
+              "pointer-events-none absolute inset-x-1 z-10 h-0.5 rounded-full bg-accent " +
+              (insertion.edge === "above" ? "-top-1.5" : "-bottom-1.5")
+            }
+          />
+        )}
+
+        <button
+          {...attributes}
+          {...listeners}
+          aria-label="Drag to reorder"
+          className={
+            "absolute left-0.5 top-1/2 flex h-6 -translate-y-1/2 cursor-grab items-center text-faint transition-opacity " +
+            (hovered ? "opacity-100" : "opacity-20")
+          }
+        >
+          <GripVertical className="h-3 w-3" />
+        </button>
+
+        <div className="flex items-start gap-2.5 pl-2">
+          <span className="flex h-5 shrink-0 items-center">
+            <Checkbox
+              checked={done}
+              onChange={() => {
+                if (!done && onComplete) onComplete(task);
+                else toggleComplete(task);
+              }}
+            />
+          </span>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-2">
+              <button
+                onClick={open}
+                title={task.title}
+                className={
+                  "min-w-0 flex-1 line-clamp-2 text-left text-[14px] font-medium leading-5 " +
+                  (done ? "text-muted line-through" : "text-text")
+                }
+              >
+                {task.title}
+              </button>
+
+              <div className="relative h-5 w-12 shrink-0">
+                {task.estimate_minutes != null && (
+                  <button
+                    onClick={open}
+                    title="Estimate"
+                    className={
+                      "absolute right-0 top-0 rounded bg-soft px-1.5 py-1 text-[10px] font-semibold tabular-nums leading-none text-muted transition-opacity " +
+                      (hovered ? "opacity-0" : "opacity-100")
+                    }
+                  >
+                    {formatDuration(task.estimate_minutes)}
+                  </button>
+                )}
+                <span
+                  className={
+                    "absolute right-0 top-0 flex items-center gap-0.5 transition-opacity " +
+                    (hovered ? "opacity-100" : "pointer-events-none opacity-0")
+                  }
+                >
+                  <button
+                    aria-label="Focus on this task"
+                    title="Focus"
+                    onPointerDown={(event) => event.stopPropagation()}
+                    onClick={() => openFocus(task.id)}
+                    className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-accent-soft hover:text-accent"
+                  >
+                    <Focus className="h-3.5 w-3.5" />
+                  </button>
+                  <button
+                    aria-label="Delete task"
+                    title="Delete"
+                    onClick={() => removeTask(task.id)}
+                    className="flex h-5 w-5 items-center justify-center rounded text-muted hover:bg-alert-soft hover:text-alert"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </span>
+              </div>
+            </div>
+
+            {hasDayMeta && (
+              <div className="mt-1.5 flex min-h-4 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] leading-none text-muted">
+                {task.scheduled_start && (
+                  <span className="font-medium tabular-nums">
+                    {task.scheduled_start}
+                  </span>
+                )}
+                {restTag && <TagChip name={restTag} onClick={open} compact />}
+                {hasSubtasks && (
+                  <button
+                    onClick={open}
+                    title="Subtasks"
+                    className="inline-flex items-center gap-1 tabular-nums hover:text-text"
+                  >
+                    <ListChecks className="h-3 w-3" />
+                    {subtaskDone}/{task.subtask_total}
+                  </button>
+                )}
+                {running && (
+                  <span
+                    title="Timer running"
+                    className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li
@@ -167,14 +308,17 @@ export function TaskItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className={
-        // At rest: surface + spacing define the card, no border (REMOVAL). Hover
-        // brings in a hairline + soft shadow (the single hover signal). relative
-        // so the insertion line can span the row. border-transparent at rest
-        // keeps the box metrics identical so hover never shifts layout.
-        "relative rounded-md border bg-surface-raised transition-shadow duration-150 ease-out " +
-        // Roomier padding in detailed mode for the richer always-on content.
-        (detailed ? "px-3 py-2.5 " : "px-3 py-2 ") +
-        (hovered ? "border-hairline shadow-sm" : "border-transparent") +
+        "relative border transition-[border-color,background-color,box-shadow] duration-150 ease-out " +
+        (inbox
+          ? "rounded-none border-transparent bg-transparent px-3 py-2.5 "
+          : detailed
+            ? "rounded-[4px] border-hairline bg-surface-raised px-3 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.045)] "
+            : "rounded-md border-transparent bg-transparent px-2.5 py-2 ") +
+        (hovered
+          ? detailed
+            ? "border-soft bg-surface-raised shadow-[0_3px_8px_rgba(0,0,0,0.08)]"
+            : "bg-accent-faint"
+          : "") +
         railClass
       }
     >
@@ -193,7 +337,7 @@ export function TaskItem({
           up to 3 lines. Controls top-align so they sit on the first title line
           when it wraps. The h-5 wrappers keep them vertically centered on a
           single-line title, preserving the dense one-row look for bare tasks. */}
-      <div className="flex items-start gap-2">
+      <div className={"flex gap-2 " + (inbox ? "items-center" : "items-start")}>
         <button
           {...attributes}
           {...listeners}
@@ -201,11 +345,11 @@ export function TaskItem({
           className={
             // Faint at rest so it reads as a quiet hint without competing with
             // the title; fully visible on hover.
-            "flex h-5 shrink-0 cursor-grab items-center text-[11px] leading-none text-faint transition-opacity " +
-            (hovered ? "opacity-100" : "opacity-0")
+            "flex h-5 shrink-0 cursor-grab items-center text-faint transition-opacity " +
+            (hovered ? "opacity-100" : inbox ? "opacity-30" : "opacity-20")
           }
         >
-          ⠿
+          <GripVertical className="h-3.5 w-3.5" />
         </button>
 
         <span className="flex h-5 shrink-0 items-center">
@@ -225,12 +369,38 @@ export function TaskItem({
           onClick={open}
           title={task.title}
           className={
-            "min-w-0 flex-1 line-clamp-3 text-left text-[14px] font-medium leading-5 " +
+            "min-w-0 flex-1 text-left text-[14px] font-medium leading-5 " +
+            (compact ? "truncate " : "line-clamp-3 ") +
             (done ? "text-muted line-through" : "text-text")
           }
         >
           {task.title}
         </button>
+
+        {inbox && task.scheduled_start && (
+          <span className="shrink-0 text-[11px] tabular-nums text-muted">
+            {task.scheduled_start}
+          </span>
+        )}
+
+        {inlineEstimate && (
+          <button
+            onClick={open}
+            title="Estimate"
+            className="mt-0.5 shrink-0 rounded-md bg-soft px-1.5 py-1 text-[10px] font-semibold tabular-nums leading-none text-muted hover:text-text"
+          >
+            {formatDuration(task.estimate_minutes!)}
+          </button>
+        )}
+
+        {inbox && restTag && <TagChip name={restTag} onClick={open} />}
+
+        {inbox && running && (
+          <span
+            title="Timer running"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-accent"
+          />
+        )}
 
         <button
           aria-label="Focus on this task"
@@ -239,29 +409,29 @@ export function TaskItem({
           onPointerDown={(e) => e.stopPropagation()}
           onClick={() => openFocus(task.id)}
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-muted hover:bg-accent-soft hover:text-accent " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-muted hover:bg-accent-soft hover:text-accent " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
-          ◎
+          <Focus className="h-3.5 w-3.5" />
         </button>
 
         <button
           aria-label="Delete task"
           onClick={() => removeTask(task.id)}
           className={
-            "flex h-5 shrink-0 items-center rounded px-1 text-[11px] leading-none text-muted hover:bg-alert-soft hover:text-alert " +
+            "flex h-5 shrink-0 items-center rounded px-1 text-muted hover:bg-alert-soft hover:text-alert " +
             (hovered ? "opacity-100" : "opacity-0")
           }
         >
-          ✕
+          <Trash2 className="h-3.5 w-3.5" />
         </button>
       </div>
 
       {/* Notes preview: a muted 1-2 line plain-text snippet, shown only when the
           task has notes. Indented to align under the title. Rich-text HTML is
           stripped to text (never rendered raw) by htmlToPlainText. */}
-      {snippet && (
+      {detailed && snippet && (
         <p
           className={
             // Detailed mode shows a longer, readable description inline; the
@@ -313,11 +483,25 @@ export function TaskItem({
           resting card stays serene. In detailed mode the full footer shows at
           rest (showExtras is always true). Indented to align under the title. */}
       {showFooter && (
-        <div className="flex flex-wrap items-center gap-2 pl-7 pt-1 text-[12px] leading-none text-muted">
+        <div
+          className={
+            "flex flex-wrap items-center gap-2 pt-1.5 text-[12px] leading-none text-muted " +
+            (dayCard ? "pl-12" : "pl-7")
+          }
+        >
           {task.scheduled_start && (
             <span className="tabular-nums text-muted">
               {task.scheduled_start}
             </span>
+          )}
+          {task.estimate_minutes != null && (
+            <button
+              onClick={open}
+              title="Estimate"
+              className="tabular-nums text-muted hover:text-text"
+            >
+              {formatDuration(task.estimate_minutes)}
+            </button>
           )}
           {running && (
             <span
@@ -326,21 +510,14 @@ export function TaskItem({
             />
           )}
           {/* First tag rests; remaining tags reveal with the extras. */}
-          {restTag && <TagChip name={restTag} onClick={open} />}
+          {restTag && (detailed || dayCard) && (
+            <TagChip name={restTag} onClick={open} />
+          )}
 
           {/* Extras: in the strip card these are kept mounted only on hover so
               resting clicks never hit them; in detailed mode they show at rest. */}
           {showExtras && (
             <>
-              {task.estimate_minutes != null && (
-                <button
-                  onClick={open}
-                  title="Estimate"
-                  className="tabular-nums text-muted hover:text-text"
-                >
-                  {formatDuration(task.estimate_minutes)}
-                </button>
-              )}
               {task.actual_minutes > 0 && (
                 <button
                   onClick={open}
@@ -354,18 +531,20 @@ export function TaskItem({
                 <button
                   onClick={open}
                   title="Subtasks"
-                  className="tabular-nums text-muted hover:text-text"
+                  className="inline-flex items-center gap-1 tabular-nums text-muted hover:text-text"
                 >
-                  ☑ {subtaskDone}/{task.subtask_total}
+                  <ListChecks className="h-3 w-3" />
+                  {subtaskDone}/{task.subtask_total}
                 </button>
               )}
               {!!task.attachment_count && task.attachment_count > 0 && (
                 <button
                   onClick={open}
                   title="Attachments"
-                  className="tabular-nums text-muted hover:text-text"
+                  className="inline-flex items-center gap-1 tabular-nums text-muted hover:text-text"
                 >
-                  📎 {task.attachment_count}
+                  <Paperclip className="h-3 w-3" />
+                  {task.attachment_count}
                 </button>
               )}
               {tags.slice(1).map((t) => (

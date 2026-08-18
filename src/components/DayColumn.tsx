@@ -20,9 +20,8 @@ import { AddTask } from "./AddTask";
 interface DayColumnProps {
   date: string; // "yyyy-MM-dd"
   tasks: Task[];
-  // "strip" (default): a fixed-width column with a right divider and selection
-  // tint, for the horizontally scrolling week strip. "day": fills the parent
-  // width with no divider and no tint, for the single expanded Day view.
+  // "strip" (default): half of the scrolling center viewport. "day": fills the
+  // parent width for the single expanded Day view.
   variant?: "strip" | "day";
 }
 
@@ -81,9 +80,7 @@ export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
 
   const isToday = date === todayKey();
   const isDay = variant === "day";
-  // The selection tint is a strip-only signal (it disambiguates the selected
-  // column among many). In Day view there is a single column, so it is dropped.
-  const isSelected = !isDay && date === selectedDate;
+  const isSelected = date === selectedDate;
   // A row that is mid-completion stays in the open (sortable) list until its
   // animation finishes, so it does not double-count or jump into Done early.
   const open = tasks.filter((t) => t.status !== "done");
@@ -97,44 +94,41 @@ export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
     <div
       data-day={date}
       className={
-        // ONE selection signal: a quiet accent-tinted wash on the selected
-        // column. No hard rail (it read as a heavy dark separator), no header
-        // ring, no top border. Strip columns are fixed width with a soft right
-        // divider; the Day-view column fills its parent and stands alone (no
-        // divider, no tint).
-        "flex flex-col " +
-        (isDay ? "w-full " : "w-60 shrink-0 border-r border-soft ") +
-        (isSelected ? "bg-accent-soft/60" : "")
+        // Strip: two-up layout in the center viewport with a sensible min width.
+        // Day view still fills the available width.
+        "flex flex-col bg-surface-raised " +
+        (isDay
+          ? "w-full "
+          : "week-strip-day border-r border-soft ")
       }
     >
       <button
         onClick={() => setDate(date)}
         title="Select this day for the timeline"
-        className={
-          "flex items-baseline justify-between gap-2 border-b border-soft px-2 py-1.5 text-left " +
-          (isSelected
-            ? "bg-surface-raised"
-            : isToday
-              ? "bg-surface-raised hover:bg-accent-faint"
-              : "bg-surface hover:bg-accent-faint")
-        }
+        className="flex h-[52px] items-center gap-3 border-b border-soft bg-surface-raised px-4 text-left hover:bg-accent-faint"
       >
-        <span className="flex items-baseline gap-1.5">
-          <span
-            className={
-              "text-[13px] font-semibold " +
-              (isSelected ? "text-accent" : "text-text")
-            }
-          >
+        <span
+          className={
+            "inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[16px] font-semibold tabular-nums " +
+            (isSelected
+              ? "bg-accent text-white"
+              : isToday
+                ? "text-accent"
+                : "text-text")
+          }
+        >
+          {dayOfMonth(date)}
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-[13px] font-semibold text-text">
             {weekdayShort(date)}
           </span>
-          <span className="text-[13px] text-muted">{dayOfMonth(date)}</span>
-          {isToday && (
-            <span className="text-[12px] font-medium text-accent">Today</span>
-          )}
+          <span className="text-[11px] text-muted">
+            {isToday ? `Today, ${open.length} open` : `${open.length} open`}
+          </span>
         </span>
         {plannedMinutes > 0 && (
-          <span className="text-[12px] tabular-nums text-muted">
+          <span className="text-[11px] tabular-nums text-muted">
             {formatDuration(plannedMinutes)}
           </span>
         )}
@@ -143,26 +137,18 @@ export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
       <div
         ref={setNodeRef}
         className={
-          "flex flex-1 flex-col overflow-y-auto px-1.5 py-2 " +
+          "flex flex-1 flex-col overflow-y-auto bg-surface px-2.5 py-2.5 " +
           (isOver ? "bg-accent-soft/60" : "")
         }
       >
         {isToday && <OverdueBand />}
 
-        <div className="mb-1 flex items-baseline justify-between px-1">
-          <span className="text-[12px] font-medium text-muted">
-            {open.length} open
-          </span>
-        </div>
-
-        {open.length === 0 ? (
-          <p className="px-1 py-1.5 text-[12px] text-faint">No tasks.</p>
-        ) : (
+        {open.length > 0 && (
           <SortableContext
             items={open.map((t) => t.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ul className="flex flex-col gap-2">
+            <ul className="flex flex-col gap-2.5">
               {open.map((task) => {
                 const isLeaving = leaving.has(task.id);
                 return (
@@ -185,10 +171,7 @@ export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
                       bucket="day"
                       column={date}
                       onComplete={beginComplete}
-                      // Detailed card everywhere (strip and Day view): full
-                      // metadata at rest, longer notes, inline checkable
-                      // subtasks. The Done group stays quiet (DoneRow).
-                      detailed
+                      detailed={isDay}
                     />
                   </div>
                 );
@@ -211,7 +194,7 @@ export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
               </span>
             </button>
             {doneOpen && (
-              <ul className="mt-1 flex flex-col gap-2">
+              <ul className="mt-1 flex flex-col gap-1.5">
                 {done.map((task) => (
                   <DoneRow key={task.id} task={task} />
                 ))}
@@ -220,9 +203,9 @@ export function DayColumn({ date, tasks, variant = "strip" }: DayColumnProps) {
           </div>
         )}
 
-        <div className="mt-1 px-0.5">
+        <div className={open.length > 0 ? "mt-1 px-0.5" : "px-0.5"}>
           <AddTask
-            placeholder="+ add"
+            placeholder="New task"
             onAdd={(title) => addToWeekDay(date, title)}
           />
         </div>
