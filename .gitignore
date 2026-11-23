@@ -33,6 +33,9 @@ coverage
 # Rust / Tauri build artifacts
 src-tauri/target/
 
+# Mac App Store provisioning profile (CI writes it from a secret)
+src-tauri/embedded.provisionprofile
+
 # Local agent and task context
 /AGENTS.md
 /CLAUDE.md
