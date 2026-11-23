@@ -33,11 +33,15 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     env:
-      KEYCHAIN: ${{ runner.temp }}/appstore.keychain-db
       APP_PATH: src-tauri/target/aarch64-apple-darwin/release/bundle/macos/Kairos.app
-      PKG_PATH: ${{ runner.temp }}/Kairos.pkg
 
     steps:
+      # The runner context is not available in job-level env, so temp paths are set here.
+      - name: Set temp paths
+        run: |
+          echo "KEYCHAIN=$RUNNER_TEMP/appstore.keychain-db" >> "$GITHUB_ENV"
+          echo "PKG_PATH=$RUNNER_TEMP/Kairos.pkg" >> "$GITHUB_ENV"
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up pnpm
