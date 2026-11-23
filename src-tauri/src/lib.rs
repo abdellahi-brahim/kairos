@@ -164,6 +164,45 @@ fn delete_attachments_dir(app: tauri::AppHandle, task_id: i64) -> Result<(), Str
     }
 }
 
+// Label of the floating Focus widget window (FOCUS_WIDGET_LABEL in src/lib/focusBridge.ts).
+const FOCUS_WIDGET_LABEL: &str = "focus-widget";
+
+// Just inside the card's 16px `rounded-2xl`, so the clip never shows the webview
+// background through the card's anti-aliased corner.
+#[cfg(target_os = "macos")]
+const WIDGET_CORNER_RADIUS: f64 = 15.0;
+
+// The Mac App Store build cannot use macOSPrivateApi, so the widget window cannot be
+// transparent there and would show square corners behind the rounded card. Round the
+// window itself with public AppKit calls instead: a clear, non-opaque NSWindow whose
+// content layer clips to the card radius. macOS then draws the shadow from that shape.
+#[cfg(target_os = "macos")]
+fn round_widget_window<R: tauri::Runtime>(window: &tauri::Window<R>) {
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+
+    let Ok(ns_window) = window.ns_window() else {
+        return;
+    };
+    let ns_window = ns_window as *mut AnyObject;
+    unsafe {
+        let clear: *mut AnyObject = msg_send![class!(NSColor), clearColor];
+        let _: () = msg_send![ns_window, setOpaque: false];
+        let _: () = msg_send![ns_window, setBackgroundColor: clear];
+        let view: *mut AnyObject = msg_send![ns_window, contentView];
+        if view.is_null() {
+            return;
+        }
+        let _: () = msg_send![view, setWantsLayer: true];
+        let layer: *mut AnyObject = msg_send![view, layer];
+        if !layer.is_null() {
+            let _: () = msg_send![layer, setCornerRadius: WIDGET_CORNER_RADIUS];
+            let _: () = msg_send![layer, setMasksToBounds: true];
+        }
+        let _: () = msg_send![ns_window, invalidateShadow];
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let migrations = vec![
@@ -248,6 +287,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .on_page_load(|webview, _payload| {
+            // Only when the window could not be made transparent (App Store build).
+            // Runs on both load events; rounding again is harmless.
+            #[cfg(target_os = "macos")]
+            if webview.label() == FOCUS_WIDGET_LABEL && !webview.config().app.macos_private_api {
+                let window = webview.window();
+                let _ = webview.run_on_main_thread(move || round_widget_window(&window));
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = webview;
+        })
         .invoke_handler(tauri::generate_handler![
             import_attachment,
             delete_attachment_file,
